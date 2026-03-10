@@ -28,15 +28,25 @@ function createRenderer(canvas, width, height) {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.setClearColor(0xffffff);
   renderer.setSize(width, height);
+
+  // Improve rendering quality on high DPI screens
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
+
+  // Better color handling
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  // Slightly better lighting response
+  renderer.toneMapping = THREE.LinearToneMapping;
+  renderer.toneMappingExposure = 1;
   return renderer;
 }
 
 function createLights(scene) {
-  const ambient = new THREE.AmbientLight(0xd5f4f5, 3);
+  const ambient = new THREE.AmbientLight(0xffffff, 2.5);
   scene.add(ambient);
 
-  const dirLight = new THREE.DirectionalLight(0xd5f4f5, 5);
-  dirLight.position.set(3, 8, 5);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 5);
+  dirLight.position.set(5, 8, 5);
   dirLight.target.position.set(0, 0, 0);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.set(6048, 6048);
