@@ -255,7 +255,7 @@ const App = () => {
       const vFov = THREE.MathUtils.degToRad(camera.fov);
       const viewHeight = 2 * Math.tan(vFov / 2) * distance;
       const viewWidth = viewHeight * camera.aspect;
-      return { halfW: viewWidth / 2, halfH: viewHeight / 2 };
+      return { halfW: viewWidth / 1.5, halfH: viewHeight / 1.5 };
     };
 
     const clampByModelEdges = () => {
@@ -452,12 +452,6 @@ const App = () => {
 
   return (
     <main className="relative w-full h-screen">
-      <h1
-        className="absolute
-      text-[50px]"
-      >
-        hello world
-      </h1>
       <canvas ref={canvasRef}></canvas>
     </main>
   );
