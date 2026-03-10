@@ -3,12 +3,13 @@ import * as THREE from "three";
 import { World, Vec3, Body, Plane, Box } from "cannon-es";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import "./index.css";
+import Trash from "./component/trash.jsx";
 
 // ─────────────────────────────────────────────
 // CONSTANTES
 // ─────────────────────────────────────────────
-const MODEL_PATH = new URL("./assets/3D/models/character.glb", import.meta.url)
-  .href;
+const MODEL_PATH = "/3D/models/character.glb";
+
 const GROUND_Y = -1;
 const MODEL_Y_OFFSET = -0.5;
 
@@ -181,7 +182,13 @@ function getMouseOnPlane(clientX, clientY, camera, renderer, planePoint) {
 // ─────────────────────────────────────────────
 const App = () => {
   const canvasRef = useRef(null);
+  const sceneRef = useRef(null);
+const cameraRef = useRef(null);
+const rendererRef = useRef(null);
+const worldRef = useRef(null);
+const spawnedItemsRef = useRef([]);
 
+const [ready, setReady] = useState(false); // ← AJOUTE CETTE LIGNE
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -190,14 +197,18 @@ const App = () => {
     const height = window.innerHeight;
 
     // ── Scène ──
-    const scene = new THREE.Scene();
+const scene = new THREE.Scene();
+sceneRef.current = scene;    
     const camera = createCamera(width / height);
-    const renderer = createRenderer(canvas, width, height);
+cameraRef.current = camera;
+const renderer = createRenderer(canvas, width, height);
+rendererRef.current = renderer;    
     const { dirLight } = createLights(scene);
     createGround(scene);
 
     // ── Physique ──
     const world = createPhysicsWorld();
+worldRef.current = world;
     const groundBody = createGroundBody();
     world.addBody(groundBody);
 
@@ -405,7 +416,7 @@ const App = () => {
         );
       }
 
-      updateLightTarget();
+  
       renderer.render(scene, camera);
     };
     animate();
@@ -435,6 +446,7 @@ const App = () => {
     // ─────────────────────────────────────────
     // CLEANUP
     // ─────────────────────────────────────────
+    setReady(true); 
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("mousedown", onMouseDown);
@@ -452,6 +464,16 @@ const App = () => {
 
   return (
     <main className="relative w-full h-screen">
+  
+{ready && (
+  <Trash
+    scene={sceneRef.current}
+    camera={cameraRef.current}
+    spawnedItems={spawnedItemsRef}
+    world={worldRef.current}
+    renderer={rendererRef.current}
+  />
+)} 
       <canvas ref={canvasRef}></canvas>
     </main>
   );
