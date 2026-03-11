@@ -1,6 +1,7 @@
-import React from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as THREE from "three";
-import { Body, Box, Vec3 } from "cannon-es";
+import { Body, Box, Vec3, Material, ContactMaterial } from "cannon-es";
 
 export default function ButtonAddItem() {
   const handleClick = () => {

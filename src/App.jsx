@@ -48,7 +48,7 @@ function createLights(scene) {
   scene.add(ambient);
 
   const dirLight = new THREE.DirectionalLight(0xffffff, 5);
-  dirLight.position.set(5, 8, 5);
+  dirLight.position.set(0, 8, 5);
   dirLight.target.position.set(0, 0, 0);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.set(6048, 6048);
