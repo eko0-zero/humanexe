@@ -1,7 +1,7 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as THREE from "three";
-import { Body, Box, Vec3, Material, ContactMaterial, World } from "cannon-es";
+import { Body, Box, Vec3, Material, ContactMaterial } from "cannon-es";
 import plus from "../assets/img/svg/plus.svg";
 
 const ITEM_MATERIAL = new Material("itemMaterial");
@@ -54,7 +54,7 @@ async function createSpawnedItem(scene, world, position, modelConfig) {
         const halfExtents = new Vec3(
           Math.max(size.x / 2, 0.05),
           Math.max(size.y / 2, 0.05),
-          Math.max(size.z / 2, 0.05),
+          Math.max(size.z / 2, 0.05)
         );
         const shape = new Box(halfExtents);
         ensureContactMaterial(world);
@@ -81,10 +81,20 @@ export default function ButtonAddItem({ scene, world, spawnedItems, camera, rend
   const isLoadingRef = useRef(false);
   const [itemCount, setItemCount] = useState(0);
 
-  // Calculer position juste sous le bouton
+  // refs drag
+  const draggingItemRef = useRef(null);
+  const dragOffset = useRef(new THREE.Vector3());
+  const dragPlanePoint = useRef(new THREE.Vector3());
+  const rendererRef = useRef(renderer);
+  const cameraRef = useRef(camera);
+
+  useEffect(() => { rendererRef.current = renderer; }, [renderer]);
+  useEffect(() => { cameraRef.current = camera; }, [camera]);
+
   const getSpawnPosition = useCallback(() => {
+    if (!cameraRef.current) return new THREE.Vector3(0, 2, 0);
     const button = document.querySelector("button");
-    if (!button || !camera) return new THREE.Vector3(0, 2, 0);
+    if (!button) return new THREE.Vector3(0, 2, 0);
 
     const rect = button.getBoundingClientRect();
     const screenX = rect.left + rect.width / 2;
@@ -94,21 +104,20 @@ export default function ButtonAddItem({ scene, world, spawnedItems, camera, rend
     const ndcY = -(screenY / window.innerHeight) * 2 + 1;
 
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), cameraRef.current);
 
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
     const spawnPos = new THREE.Vector3();
     raycaster.ray.intersectPlane(plane, spawnPos);
 
-    spawnPos.y = GROUND_Y + 2.5; // un peu au-dessus du sol pour tomber
-    spawnPos.z = 0;
+    spawnPos.y = GROUND_Y + 2.5;
+    spawnPos.z = 0.2;
     return spawnPos;
-  }, [camera]);
+  }, []);
 
   const handleClick = useCallback(async () => {
     if (!scene || !world || !spawnedItems || isLoadingRef.current) return;
     isLoadingRef.current = true;
-
     try {
       const spawnPos = getSpawnPosition();
       const modelConfig = ITEM_MODELS[Math.floor(Math.random() * ITEM_MODELS.length)];
@@ -122,99 +131,107 @@ export default function ButtonAddItem({ scene, world, spawnedItems, camera, rend
     }
   }, [scene, world, spawnedItems, getSpawnPosition]);
 
-  // Animation pour suivre les corps physiques
+  const getMouseOnPlane = (clientX, clientY) => {
+    if (!rendererRef.current?.domElement || !cameraRef.current) return new THREE.Vector3();
+    const rect = rendererRef.current.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, cameraRef.current);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -dragPlanePoint.current.z);
+    const point = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, point);
+    return point;
+  };
+
+  // **Fix du drag : raycaster correct pour les intersections**
+  const onItemMouseDown = (clientX, clientY) => {
+    if (!rendererRef.current?.domElement || !cameraRef.current) return;
+    const rect = rendererRef.current.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, cameraRef.current);
+
+    for (let i = spawnedItems.current.length - 1; i >= 0; i--) {
+      const item = spawnedItems.current[i];
+      const intersects = raycaster.intersectObject(item.mesh, true);
+      if (intersects.length > 0) {
+        draggingItemRef.current = item;
+        dragPlanePoint.current.copy(item.body.position);
+        const point = getMouseOnPlane(clientX, clientY);
+        dragOffset.current.set(item.body.position.x - point.x, item.body.position.y - point.y, 0);
+        item.body.mass = 0;
+        item.body.updateMassProperties();
+        item.body.velocity.set(0, 0, 0);
+        item.body.angularVelocity.set(0, 0, 0);
+        break;
+      }
+    }
+  };
+
+  const onItemMouseMove = (clientX, clientY) => {
+    if (!draggingItemRef.current) return;
+    const target = getMouseOnPlane(clientX, clientY);
+    draggingItemRef.current.body.position.x = target.x + dragOffset.current.x;
+    draggingItemRef.current.body.position.y = target.y + dragOffset.current.y;
+    draggingItemRef.current.body.position.z = dragPlanePoint.current.z;
+  };
+
+  const onItemMouseUp = () => {
+    if (!draggingItemRef.current) return;
+    draggingItemRef.current.body.mass = 1;
+    draggingItemRef.current.body.updateMassProperties();
+    draggingItemRef.current = null;
+  };
+
   useEffect(() => {
-    if (!renderer || !scene || !camera) return;
+    const handleMouseDown = (e) => onItemMouseDown(e.clientX, e.clientY);
+    const handleMouseMove = (e) => onItemMouseMove(e.clientX, e.clientY);
+    const handleMouseUp = () => onItemMouseUp();
+
+    window.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    window.addEventListener("touchstart", (e) => {
+      const pos = e.touches[0];
+      onItemMouseDown(pos.clientX, pos.clientY);
+    }, { passive: false });
+
+    window.addEventListener("touchmove", (e) => {
+      const pos = e.touches[0];
+      onItemMouseMove(pos.clientX, pos.clientY);
+    }, { passive: false });
+
+    window.addEventListener("touchend", onItemMouseUp);
+
+    return () => {
+      window.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchstart", handleMouseDown);
+      window.removeEventListener("touchmove", handleMouseMove);
+      window.removeEventListener("touchend", onItemMouseUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!rendererRef.current || !scene || !cameraRef.current) return;
     const animate = () => {
       spawnedItems.current.forEach((item) => {
         item.mesh.position.copy(item.body.position);
         item.mesh.quaternion.copy(item.body.quaternion);
       });
-      renderer.render(scene, camera);
+      rendererRef.current.render(scene, cameraRef.current);
       requestAnimationFrame(animate);
-
-      const onItemMouseDown = (clientX, clientY) => {
-  const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2();
-  const rect = rendererRef.current.domElement.getBoundingClientRect();
-  mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-  raycaster.setFromCamera(mouse, cameraRef.current);
-
-  for (let i = spawnedItemsRef.current.length - 1; i >= 0; i--) {
-    const item = spawnedItemsRef.current[i];
-    const intersects = raycaster.intersectObject(item.mesh, true);
-    if (intersects.length > 0) {
-      draggingItemRef.current = item;
-      dragPlanePoint.current.copy(item.body.position);
-      const target = intersects[0].point;
-      dragOffset.current.set(
-        item.body.position.x - target.x,
-        item.body.position.y - target.y,
-        0
-      );
-      item.body.mass = 0;
-      item.body.updateMassProperties();
-      item.body.velocity.set(0, 0, 0);
-      item.body.angularVelocity.set(0, 0, 0);
-      break;
-    }
-
-    window.addEventListener("mousedown", (e) => {
-  const pos = e.touches?.[0] || e;
-  onItemMouseDown(pos.clientX, pos.clientY);
-});
-window.addEventListener("mousemove", (e) => {
-  const pos = e.touches?.[0] || e;
-  onItemMouseMove(pos.clientX, pos.clientY);
-});
-window.addEventListener("mouseup", onItemMouseUp);
-
-window.addEventListener("touchstart", (e) => {
-  const pos = e.touches[0];
-  onItemMouseDown(pos.clientX, pos.clientY);
-}, { passive: false });
-
-window.addEventListener("touchmove", (e) => {
-  const pos = e.touches[0];
-  onItemMouseMove(pos.clientX, pos.clientY);
-}, { passive: false });
-
-window.addEventListener("touchend", onItemMouseUp);
-
-window.removeEventListener("mousedown", onItemMouseDown);
-window.removeEventListener("mousemove", onItemMouseMove);
-window.removeEventListener("mouseup", onItemMouseUp);
-window.removeEventListener("touchstart", onItemMouseDown);
-window.removeEventListener("touchmove", onItemMouseMove);
-window.removeEventListener("touchend", onItemMouseUp);
-  }
-};
-
-const onItemMouseMove = (clientX, clientY) => {
-  if (!draggingItemRef.current) return;
-  const target = getMouseOnPlane(
-    clientX,
-    clientY,
-    cameraRef.current,
-    rendererRef.current,
-    dragPlanePoint.current
-  );
-  draggingItemRef.current.body.position.x = target.x + dragOffset.current.x;
-  draggingItemRef.current.body.position.y = target.y + dragOffset.current.y;
-  if (draggingItemRef.current.body.position.y < GROUND_Y + 0.05)
-    draggingItemRef.current.body.position.y = GROUND_Y + 0.05;
-};
-
-const onItemMouseUp = () => {
-  if (!draggingItemRef.current) return;
-  draggingItemRef.current.body.mass = 1;
-  draggingItemRef.current.body.updateMassProperties();
-  draggingItemRef.current = null;
-};
     };
     animate();
-  }, [renderer, scene, camera, spawnedItems]);
+  }, [scene, spawnedItems]);
 
   return (
     <button
