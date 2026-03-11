@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as THREE from "three";
 
-const TRASH_PATH = "/3D/models/trash.glb";
+const TRASH_PATH = "./3D/models/trash.glb";
 const TRASH_Z_POSITION = 0.37;
 const BASE_SCALE = 0.8;
 const HOVER_SCALE = 0.85;

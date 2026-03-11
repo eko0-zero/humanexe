@@ -9,7 +9,7 @@ import ButtonAddItem from "./component/ButtonAddItems.jsx";
 // ─────────────────────────────────────────────
 // CONSTANTES
 // ─────────────────────────────────────────────
-const MODEL_PATH = "/3D/models/character.glb";
+const MODEL_PATH = "./3D/models/character.glb";
 
 const GROUND_Y = -1;
 const MODEL_Y_OFFSET = -0.5;
