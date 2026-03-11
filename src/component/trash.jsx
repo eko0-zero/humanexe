@@ -15,72 +15,78 @@ export default function Trash({
   world,
   renderer,
 }) {
-  const trashRef = useRef();
+  const trashRef = useRef(null);
   const trashBoundsRef = useRef({
     position: new THREE.Vector3(),
     size: new THREE.Vector3(0.5, 0.5, 0.5),
   });
+
   const raycasterRef = useRef(new THREE.Raycaster());
   const mouseRef = useRef(new THREE.Vector2());
   const isHoveredRef = useRef(false);
 
-  // === Chargement du modèle avec retry si nécessaire ===
+  // =========================
+  // Chargement du modèle
+  // =========================
   useEffect(() => {
     if (!scene || !camera) return;
 
-    const loadTrashModel = (attempt = 1) => {
-      const loader = new GLTFLoader();
-      loader.load(
-        TRASH_PATH,
-        (gltf) => {
-          const trash = gltf.scene;
-          trash.castShadow = true;
-          trash.receiveShadow = true;
+    const loader = new GLTFLoader();
 
-          trash.position.set(100, GROUND_Y + 0.2, TRASH_Z_POSITION);
-          trash.scale.setScalar(BASE_SCALE);
-          trash.rotation.set(6.1, Math.PI / 2, 0);
+    loader.load(
+      TRASH_PATH,
+      (gltf) => {
+        const trash = gltf.scene;
 
-          trash.traverse((node) => {
-            if (node.isMesh) {
-              node.castShadow = true;
-              node.receiveShadow = true;
-              if (node.material) node.material = node.material.clone();
+        trash.castShadow = true;
+        trash.receiveShadow = true;
+
+        trash.position.set(100, GROUND_Y + 0.2, TRASH_Z_POSITION);
+        trash.scale.setScalar(BASE_SCALE);
+        trash.rotation.set(6.1, Math.PI / 2, 0);
+
+        trash.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+
+            if (node.material) {
+              node.material = node.material.clone();
             }
-          });
+          }
+        });
 
-          const box = new THREE.Box3().setFromObject(trash);
-          trashBoundsRef.current = {
-            position: trash.position.clone(),
-            size: box.getSize(new THREE.Vector3()),
-          };
+        const box = new THREE.Box3().setFromObject(trash);
 
-          scene.add(trash);
-          trashRef.current = trash;
+        trashBoundsRef.current = {
+          position: trash.position.clone(),
+          size: box.getSize(new THREE.Vector3()),
+        };
 
-          console.log("✅ Trash chargé avec succès");
-        },
-        undefined,
-        (err) => {
-          console.warn(
-            `Erreur chargement trash.glb (attempt ${attempt}):`,
-            err,
-          );
-          if (attempt < 3) setTimeout(() => loadTrashModel(attempt + 1), 200); // retry
-        },
-      );
-    };
+        scene.add(trash);
+        trashRef.current = trash;
 
-    loadTrashModel();
+        console.log("✅ Trash chargé");
+      },
+      undefined,
+      (err) => {
+        console.error("Erreur chargement trash:", err);
+      },
+    );
   }, [scene, camera]);
 
-  // === Mise à jour du positionnement ===
+  // =========================
+  // Positionnement + Scale
+  // =========================
   useEffect(() => {
     if (!renderer || !camera) return;
+
     const updateTrash = () => {
       if (!trashRef.current) return;
+
       const distance = camera.position.z;
       const vFov = THREE.MathUtils.degToRad(camera.fov);
+
       const viewHeight = 2 * Math.tan(vFov / 2) * distance;
       const viewWidth = viewHeight * camera.aspect;
 
@@ -89,83 +95,138 @@ export default function Trash({
       trashRef.current.position.z = TRASH_Z_POSITION;
 
       const targetScale = isHoveredRef.current ? HOVER_SCALE : BASE_SCALE;
+
       const smoothScale = THREE.MathUtils.lerp(
         trashRef.current.scale.x,
         targetScale,
         0.1,
       );
+
       trashRef.current.scale.setScalar(smoothScale);
 
       trashBoundsRef.current.position.copy(trashRef.current.position);
     };
 
     const originalRender = renderer.render.bind(renderer);
+
     renderer.render = function (scene, camera) {
       updateTrash();
+      checkCollisions();
       return originalRender(scene, camera);
+    };
+
+    const checkCollisions = () => {
+      if (!trashRef.current) return;
+      if (!spawnedItems.current.length) return;
+
+      const trashPos = trashRef.current.position;
+      const trashSize = trashBoundsRef.current.size;
+
+      const trashRadius = Math.max(
+        trashSize.x,
+        trashSize.y,
+        trashSize.z,
+      ) / 2;
+
+      for (let i = spawnedItems.current.length - 1; i >= 0; i--) {
+        const item = spawnedItems.current[i];
+
+        if (!item.body) continue;
+
+        const itemPos = item.body.position;
+
+        const distance = trashPos.distanceTo(itemPos);
+
+        if (distance < trashRadius + 0.15) {
+          if (item.mesh && item.mesh.parent) {
+            item.mesh.parent.remove(item.mesh);
+          }
+
+          if (item.body && world) {
+            world.removeBody(item.body);
+          }
+
+          spawnedItems.current.splice(i, 1);
+        }
+      }
     };
 
     return () => {
       renderer.render = originalRender;
     };
-  }, [renderer, camera]);
+  }, [renderer, camera, spawnedItems, world]);
 
-  // === Hover detection ===
+  // =========================
+  // Hover detection
+  // =========================
   useEffect(() => {
     if (!renderer || !camera) return;
+
     const onMouseMove = (e) => {
       if (!trashRef.current) return;
+
       const rect = renderer.domElement.getBoundingClientRect();
-      mouseRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      mouseRef.current.x =
+        ((e.clientX - rect.left) / rect.width) * 2 - 1;
+
+      mouseRef.current.y =
+        -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
       raycasterRef.current.setFromCamera(mouseRef.current, camera);
-      isHoveredRef.current =
-        raycasterRef.current.intersectObject(trashRef.current, true).length > 0;
+
+      const intersects = raycasterRef.current.intersectObject(
+        trashRef.current,
+        true,
+      );
+
+      isHoveredRef.current = intersects.length > 0;
     };
+
     window.addEventListener("mousemove", onMouseMove);
-    return () => window.removeEventListener("mousemove", onMouseMove);
+
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+    };
   }, [renderer, camera]);
 
-  // === Click pour supprimer tous les items ===
+  // =========================
+  // Click pour supprimer
+  // =========================
   useEffect(() => {
     if (!renderer || !camera) return;
+
     const onClick = () => {
       if (!trashRef.current) return;
+
       raycasterRef.current.setFromCamera(mouseRef.current, camera);
-      if (
-        raycasterRef.current.intersectObject(trashRef.current, true).length > 0
-      ) {
+
+      const intersects = raycasterRef.current.intersectObject(
+        trashRef.current,
+        true,
+      );
+
+      if (intersects.length > 0) {
         spawnedItems.current.forEach((item) => {
-          if (item.mesh && item.mesh.parent) item.mesh.parent.remove(item.mesh);
-          if (item.body && world) world.removeBody(item.body);
+          if (item.mesh && item.mesh.parent) {
+            item.mesh.parent.remove(item.mesh);
+          }
+
+          if (item.body && world) {
+            world.removeBody(item.body);
+          }
         });
+
         spawnedItems.current = [];
       }
     };
-    window.addEventListener("click", onClick);
-    return () => window.removeEventListener("click", onClick);
-  }, [renderer, camera, spawnedItems, world]);
 
-  // === Collision check exposé globalement ===
-  useEffect(() => {
-    window.checkTrashCollisions = () => {
-      if (!trashRef.current || !spawnedItems.current.length) return;
-      const trashPos = trashRef.current.position;
-      const trashSize = trashBoundsRef.current.size;
-      const trashRadius = Math.max(trashSize.x, trashSize.y, trashSize.z) / 2;
-      for (let i = spawnedItems.current.length - 1; i >= 0; i--) {
-        const item = spawnedItems.current[i];
-        const itemPos = item.body.position;
-        const distance = trashPos.distanceTo(itemPos);
-        if (distance < trashRadius + 0.1) {
-          if (item.mesh && item.mesh.parent) item.mesh.parent.remove(item.mesh);
-          if (item.body && world) world.removeBody(item.body);
-          spawnedItems.current.splice(i, 1);
-        }
-      }
+    window.addEventListener("click", onClick);
+
+    return () => {
+      window.removeEventListener("click", onClick);
     };
-    return () => delete window.checkTrashCollisions;
-  }, [spawnedItems, world]);
+  }, [renderer, camera, spawnedItems, world]);
 
   return null;
 }
