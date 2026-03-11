@@ -17,7 +17,7 @@ const MODEL_Y_OFFSET = -0.5;
 // HELPERS — scène Three.js
 // ─────────────────────────────────────────────
 function createCamera(aspect) {
-  const camera = new THREE.PerspectiveCamera(55, aspect);
+  const camera = new THREE.PerspectiveCamera(56, aspect);
   camera.position.set(0, 2, 2.5);
   camera.rotation.x = -0.5;
   return camera;
@@ -183,12 +183,12 @@ function getMouseOnPlane(clientX, clientY, camera, renderer, planePoint) {
 const App = () => {
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
-const cameraRef = useRef(null);
-const rendererRef = useRef(null);
-const worldRef = useRef(null);
-const spawnedItemsRef = useRef([]);
+  const cameraRef = useRef(null);
+  const rendererRef = useRef(null);
+  const worldRef = useRef(null);
+  const spawnedItemsRef = useRef([]);
 
-const [ready, setReady] = useState(false); // ← AJOUTE CETTE LIGNE
+  const [ready, setReady] = useState(false); // ← AJOUTE CETTE LIGNE
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -197,18 +197,18 @@ const [ready, setReady] = useState(false); // ← AJOUTE CETTE LIGNE
     const height = window.innerHeight;
 
     // ── Scène ──
-const scene = new THREE.Scene();
-sceneRef.current = scene;    
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
     const camera = createCamera(width / height);
-cameraRef.current = camera;
-const renderer = createRenderer(canvas, width, height);
-rendererRef.current = renderer;    
+    cameraRef.current = camera;
+    const renderer = createRenderer(canvas, width, height);
+    rendererRef.current = renderer;
     const { dirLight } = createLights(scene);
     createGround(scene);
 
     // ── Physique ──
     const world = createPhysicsWorld();
-worldRef.current = world;
+    worldRef.current = world;
     const groundBody = createGroundBody();
     world.addBody(groundBody);
 
@@ -416,7 +416,6 @@ worldRef.current = world;
         );
       }
 
-  
       renderer.render(scene, camera);
     };
     animate();
@@ -446,7 +445,7 @@ worldRef.current = world;
     // ─────────────────────────────────────────
     // CLEANUP
     // ─────────────────────────────────────────
-    setReady(true); 
+    setReady(true);
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("mousedown", onMouseDown);
@@ -464,16 +463,15 @@ worldRef.current = world;
 
   return (
     <main className="relative w-full h-screen">
-  
-{ready && (
-  <Trash
-    scene={sceneRef.current}
-    camera={cameraRef.current}
-    spawnedItems={spawnedItemsRef}
-    world={worldRef.current}
-    renderer={rendererRef.current}
-  />
-)} 
+      {ready && (
+        <Trash
+          scene={sceneRef.current}
+          camera={cameraRef.current}
+          spawnedItems={spawnedItemsRef}
+          world={worldRef.current}
+          renderer={rendererRef.current}
+        />
+      )}
       <canvas ref={canvasRef}></canvas>
     </main>
   );
