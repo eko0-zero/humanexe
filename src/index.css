@@ -5,6 +5,9 @@
 @theme {
   --font-host: "Host Grotesk", sans-serif;
 }
+@theme {
+  --text-grey: #383838;
+}
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;

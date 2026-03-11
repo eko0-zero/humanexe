@@ -464,7 +464,7 @@ const App = () => {
 
   return (
     <main className="relative w-full h-screen">
-      <h1 className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem]">
+      <h1 className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
         Click on “space” or “esc” to open the menu.
       </h1>
       <ButtonAddItem />
