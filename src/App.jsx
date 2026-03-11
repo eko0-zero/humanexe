@@ -14,6 +14,7 @@ const MODEL_PATH = "./3D/models/character.glb";
 const GROUND_Y = -1;
 const MODEL_Y_OFFSET = -0.5;
 
+
 // ─────────────────────────────────────────────
 // HELPERS — scène Three.js
 // ─────────────────────────────────────────────
@@ -188,6 +189,12 @@ const App = () => {
   const rendererRef = useRef(null);
   const worldRef = useRef(null);
   const spawnedItemsRef = useRef([]);
+  const draggingItemRef = useRef(null); // item actuellement drag & drop
+const dragOffset = useRef(new THREE.Vector3()); // offset souris → centre
+const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projection
+  
+ const meshRef = useRef(null);          // ← ref pour le mesh du personnage
+  const characterBodyRef = useRef(null); // ← ref pour le corps physique
 
   const [ready, setReady] = useState(false); // ← AJOUTE CETTE LIGNE
   useEffect(() => {
@@ -464,10 +471,36 @@ const App = () => {
 
   return (
     <main className="relative w-full h-screen">
-      <h1 className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
+      <p className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
         Click on “space” or “esc” to open the menu.
-      </h1>
-      <ButtonAddItem />
+      </p>
+<ButtonAddItem
+  scene={sceneRef.current}
+  world={worldRef.current}
+  camera={cameraRef.current}
+  renderer={rendererRef.current}
+  spawnedItems={spawnedItemsRef}
+  characterBody={characterBodyRef.current} // ← on passe maintenant le ref
+  getViewBounds={() => {
+    const camera = cameraRef.current;
+    const mesh = meshRef.current;
+
+    if (!camera || !mesh) {
+      return { halfW: 5, halfH: 5 };
+    }
+
+    const distance = camera.position.z - mesh.position.z;
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+
+    const viewHeight = 2 * Math.tan(vFov / 2) * distance;
+    const viewWidth = viewHeight * camera.aspect;
+
+    return {
+      halfW: viewWidth / 2,
+      halfH: viewHeight / 2,
+    };
+  }}
+/>
       {ready && (
         <Trash
           scene={sceneRef.current}
