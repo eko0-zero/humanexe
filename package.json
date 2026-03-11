@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/host-grotesk": "^5.2.8",
     "@tailwindcss/vite": "^4.2.1",
     "cannon-es": "^0.20.0",
     "react": "^19.2.0",

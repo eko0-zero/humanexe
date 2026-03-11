@@ -4,6 +4,7 @@ import { World, Vec3, Body, Plane, Box } from "cannon-es";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import "./index.css";
 import Trash from "./component/trash.jsx";
+import ButtonAddItem from "./component/ButtonAddItems.jsx";
 
 // ─────────────────────────────────────────────
 // CONSTANTES
@@ -463,6 +464,10 @@ const App = () => {
 
   return (
     <main className="relative w-full h-screen">
+      <h1 className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem]">
+        Click on “space” or “esc” to open the menu.
+      </h1>
+      <ButtonAddItem />
       {ready && (
         <Trash
           scene={sceneRef.current}
