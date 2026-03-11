@@ -6,6 +6,10 @@ import plus from "../assets/img/svg/plus.svg";
 
 const ITEM_MATERIAL = new Material("itemMaterial");
 const GROUND_Y = -1;
+const LOCKED_Z = 0.2;
+
+const loader = new GLTFLoader();
+const modelCache = {};
 
 const ITEM_MODELS = [
   { name: "waffle", path: "./3D/models/waffle.glb", stats: { health: 10, weight: 1, speed: 3, rarity: 1 } },
@@ -15,215 +19,229 @@ const ITEM_MODELS = [
 ];
 
 let contactMaterialAdded = false;
+
 function ensureContactMaterial(world) {
   if (contactMaterialAdded) return;
   const contact = new ContactMaterial(ITEM_MATERIAL, ITEM_MATERIAL, {
     friction: 0.6,
     restitution: 0.25,
-    contactEquationStiffness: 1e7,
-    contactEquationRelaxation: 3,
   });
   world.addContactMaterial(contact);
   contactMaterialAdded = true;
 }
 
-async function createSpawnedItem(scene, world, position, modelConfig) {
-  return new Promise((resolve, reject) => {
-    const loader = new GLTFLoader();
-    loader.load(
-      modelConfig.path,
-      (gltf) => {
-        const model = gltf.scene;
-        model.position.copy(position);
-        model.castShadow = true;
-        model.receiveShadow = true;
-        model.traverse((node) => {
-          if (node.isMesh) {
-            node.castShadow = true;
-            node.receiveShadow = true;
-            if (node.material) node.material = node.material.clone();
-          }
-        });
-        scene.add(model);
-
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const centerY = (box.min.y + box.max.y) / 2;
-        const itemGroundOffset = centerY - box.min.y;
-
-        const halfExtents = new Vec3(
-          Math.max(size.x / 2, 0.05),
-          Math.max(size.y / 2, 0.05),
-          Math.max(size.z / 2, 0.05)
-        );
-        const shape = new Box(halfExtents);
-        ensureContactMaterial(world);
-
-        const body = new Body({
-          mass: 1,
-          material: ITEM_MATERIAL,
-          linearDamping: 0.4,
-          angularDamping: 0.8,
-        });
-        body.addShape(shape);
-        body.position.set(position.x, position.y, position.z);
-        world.addBody(body);
-
-        resolve({ mesh: model, body, size, groundOffset: itemGroundOffset, modelName: modelConfig.name, stats: modelConfig.stats });
-      },
-      undefined,
-      (error) => reject(error)
-    );
+async function loadModel(path) {
+  if (modelCache[path]) return modelCache[path];
+  const gltf = await loader.loadAsync(path);
+  gltf.scene.traverse((node) => {
+    if (node.isMesh) {
+      node.castShadow = true;
+      node.receiveShadow = true;
+    }
   });
+  modelCache[path] = gltf.scene;
+  return gltf.scene;
+}
+
+async function createSpawnedItem(scene, world, position, modelConfig) {
+  const baseModel = await loadModel(modelConfig.path);
+  const model = baseModel.clone(true);
+
+  model.position.copy(position);
+  scene.add(model);
+
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+
+  const halfExtents = new Vec3(
+    Math.max(size.x / 2, 0.05),
+    Math.max(size.y / 2, 0.05),
+    Math.max(size.z / 2, 0.05)
+  );
+
+  const shape = new Box(halfExtents);
+
+  ensureContactMaterial(world);
+
+  const body = new Body({
+    mass: 1,
+    material: ITEM_MATERIAL,
+    linearDamping: 0.4,
+    angularDamping: 0.8,
+  });
+
+  body.addShape(shape);
+  body.position.set(position.x, position.y, LOCKED_Z);
+
+  // verrou axe Z et rotations
+  body.linearFactor.set(1, 1, 0);
+  body.angularFactor.set(0, 0, 1);
+
+  world.addBody(body);
+
+  const item = {
+    mesh: model,
+    body,
+    modelName: modelConfig.name,
+    stats: modelConfig.stats
+  };
+
+  // lien direct mesh → item
+  model.userData.itemRef = item;
+
+  return item;
 }
 
 export default function ButtonAddItem({ scene, world, spawnedItems, camera, renderer }) {
   const isLoadingRef = useRef(false);
   const [itemCount, setItemCount] = useState(0);
 
-  // refs drag
   const draggingItemRef = useRef(null);
   const dragOffset = useRef(new THREE.Vector3());
-  const dragPlanePoint = useRef(new THREE.Vector3());
+
   const rendererRef = useRef(renderer);
   const cameraRef = useRef(camera);
+
+  const pickableMeshes = useRef([]);
 
   useEffect(() => { rendererRef.current = renderer; }, [renderer]);
   useEffect(() => { cameraRef.current = camera; }, [camera]);
 
   const getSpawnPosition = useCallback(() => {
-    if (!cameraRef.current) return new THREE.Vector3(0, 2, 0);
     const button = document.querySelector("button");
     if (!button) return new THREE.Vector3(0, 2, 0);
 
     const rect = button.getBoundingClientRect();
-    const screenX = rect.left + rect.width / 2;
-    const screenY = rect.bottom + 10;
 
-    const ndcX = (screenX / window.innerWidth) * 2 - 1;
-    const ndcY = -(screenY / window.innerHeight) * 2 + 1;
+    const ndcX = ((rect.left + rect.width / 2) / window.innerWidth) * 2 - 1;
+    const ndcY = -((rect.bottom + 10) / window.innerHeight) * 2 + 1;
 
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), cameraRef.current);
 
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-    const spawnPos = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, spawnPos);
+    const pos = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, pos);
 
-    spawnPos.y = GROUND_Y + 2.5;
-    spawnPos.z = 0.2;
-    return spawnPos;
+    pos.y = GROUND_Y + 2.5;
+    pos.z = LOCKED_Z;
+
+    return pos;
   }, []);
 
   const handleClick = useCallback(async () => {
-    if (!scene || !world || !spawnedItems || isLoadingRef.current) return;
+    if (!scene || !world || isLoadingRef.current) return;
+
     isLoadingRef.current = true;
+
     try {
       const spawnPos = getSpawnPosition();
       const modelConfig = ITEM_MODELS[Math.floor(Math.random() * ITEM_MODELS.length)];
       const item = await createSpawnedItem(scene, world, spawnPos, modelConfig);
+
       spawnedItems.current.push(item);
+      pickableMeshes.current.push(item.mesh);
       setItemCount(spawnedItems.current.length);
     } catch (err) {
       console.error(err);
     } finally {
       isLoadingRef.current = false;
     }
-  }, [scene, world, spawnedItems, getSpawnPosition]);
+  }, [scene, world, getSpawnPosition, spawnedItems]);
 
-  const getMouseOnPlane = (clientX, clientY) => {
-    if (!rendererRef.current?.domElement || !cameraRef.current) return new THREE.Vector3();
+  const getMouseWorld = (x, y) => {
     const rect = rendererRef.current.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -((clientY - rect.top) / rect.height) * 2 + 1
+      ((x - rect.left) / rect.width) * 2 - 1,
+      -((y - rect.top) / rect.height) * 2 + 1
     );
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, cameraRef.current);
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -dragPlanePoint.current.z);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -LOCKED_Z);
     const point = new THREE.Vector3();
     raycaster.ray.intersectPlane(plane, point);
     return point;
   };
 
-  // **Fix du drag : raycaster correct pour les intersections**
-  const onItemMouseDown = (clientX, clientY) => {
-    if (!rendererRef.current?.domElement || !cameraRef.current) return;
+  const onMouseDown = (x, y) => {
     const rect = rendererRef.current.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -((clientY - rect.top) / rect.height) * 2 + 1
+      ((x - rect.left) / rect.width) * 2 - 1,
+      -((y - rect.top) / rect.height) * 2 + 1
     );
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, cameraRef.current);
+    const hits = raycaster.intersectObjects(pickableMeshes.current, true);
+    if (!hits.length) return;
 
-    for (let i = spawnedItems.current.length - 1; i >= 0; i--) {
-      const item = spawnedItems.current[i];
-      const intersects = raycaster.intersectObject(item.mesh, true);
-      if (intersects.length > 0) {
-        draggingItemRef.current = item;
-        dragPlanePoint.current.copy(item.body.position);
-        const point = getMouseOnPlane(clientX, clientY);
-        dragOffset.current.set(item.body.position.x - point.x, item.body.position.y - point.y, 0);
-        item.body.mass = 0;
-        item.body.updateMassProperties();
-        item.body.velocity.set(0, 0, 0);
-        item.body.angularVelocity.set(0, 0, 0);
-        break;
-      }
-    }
+    let obj = hits[0].object;
+    while (obj && !obj.userData.itemRef) obj = obj.parent;
+    if (!obj) return;
+
+    const item = obj.userData.itemRef;
+    draggingItemRef.current = item;
+
+    const point = getMouseWorld(x, y);
+    dragOffset.current.set(
+      item.body.position.x - point.x,
+      item.body.position.y - point.y,
+      0
+    );
+
+    item.body.mass = 0;
+    item.body.updateMassProperties();
+    item.body.velocity.set(0, 0, 0);
+    item.body.angularVelocity.set(0, 0, 0);
   };
 
-  const onItemMouseMove = (clientX, clientY) => {
+  const onMouseMove = (x, y) => {
     if (!draggingItemRef.current) return;
-    const target = getMouseOnPlane(clientX, clientY);
-    draggingItemRef.current.body.position.x = target.x + dragOffset.current.x;
-    draggingItemRef.current.body.position.y = target.y + dragOffset.current.y;
-    draggingItemRef.current.body.position.z = dragPlanePoint.current.z;
+    const point = getMouseWorld(x, y);
+    const body = draggingItemRef.current.body;
+    body.position.x = point.x + dragOffset.current.x;
+    body.position.y = point.y + dragOffset.current.y;
+    body.position.z = LOCKED_Z;
+    body.velocity.z = 0;
   };
 
-  const onItemMouseUp = () => {
+  const onMouseUp = () => {
     if (!draggingItemRef.current) return;
-    draggingItemRef.current.body.mass = 1;
-    draggingItemRef.current.body.updateMassProperties();
+    const body = draggingItemRef.current.body;
+    body.mass = 1;
+    body.updateMassProperties();
     draggingItemRef.current = null;
   };
 
   useEffect(() => {
-    const handleMouseDown = (e) => onItemMouseDown(e.clientX, e.clientY);
-    const handleMouseMove = (e) => onItemMouseMove(e.clientX, e.clientY);
-    const handleMouseUp = () => onItemMouseUp();
+    const down = e => onMouseDown(e.clientX, e.clientY);
+    const move = e => onMouseMove(e.clientX, e.clientY);
+    const up = () => onMouseUp();
 
-    window.addEventListener("mousedown", handleMouseDown);
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mousedown", down);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
 
-    window.addEventListener("touchstart", (e) => {
-      const pos = e.touches[0];
-      onItemMouseDown(pos.clientX, pos.clientY);
-    }, { passive: false });
-
-    window.addEventListener("touchmove", (e) => {
-      const pos = e.touches[0];
-      onItemMouseMove(pos.clientX, pos.clientY);
-    }, { passive: false });
-
-    window.addEventListener("touchend", onItemMouseUp);
+    window.addEventListener("touchstart", e => onMouseDown(e.touches[0].clientX, e.touches[0].clientY), { passive: false });
+    window.addEventListener("touchmove", e => onMouseMove(e.touches[0].clientX, e.touches[0].clientY), { passive: false });
+    window.addEventListener("touchend", onMouseUp);
 
     return () => {
-      window.removeEventListener("mousedown", handleMouseDown);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("touchstart", handleMouseDown);
-      window.removeEventListener("touchmove", handleMouseMove);
-      window.removeEventListener("touchend", onItemMouseUp);
+      window.removeEventListener("mousedown", down);
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("touchstart", down);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", onMouseUp);
     };
   }, []);
 
   useEffect(() => {
     if (!rendererRef.current || !scene || !cameraRef.current) return;
     const animate = () => {
-      spawnedItems.current.forEach((item) => {
+      spawnedItems.current.forEach(item => {
+        // sécurise axe Z
+        item.body.position.z = LOCKED_Z;
+        item.body.velocity.z = 0;
         item.mesh.position.copy(item.body.position);
         item.mesh.quaternion.copy(item.body.quaternion);
       });
@@ -236,10 +254,10 @@ export default function ButtonAddItem({ scene, world, spawnedItems, camera, rend
   return (
     <button
       type="button"
-      onClick={(e) => { e.stopPropagation(); handleClick(); }}
+      onClick={e => { e.stopPropagation(); handleClick(); }}
       className="absolute top-[15vh] left-6 px-5 py-3 hover:px-7 hover:py-4 z-10 transition-all duration-150 bg-white border-2 border-black rounded-[100px] flex items-center gap-3 font-host font-light text-[1.8rem]"
     >
-      <img src={plus} alt="plus" />
+      <img src={plus} alt="plus"/>
       <span>add item</span>
     </button>
   );
