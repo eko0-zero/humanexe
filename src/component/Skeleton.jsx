@@ -1,9 +1,6 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import * as THREE from "three";
 
-// ─────────────────────────────────────────────
-// Spring simple : position avec inertie
-// ─────────────────────────────────────────────
 class Spring {
   constructor(stiffness = 8, damping = 0.6) {
     this.value = 0;
@@ -35,136 +32,107 @@ const Skeleton = forwardRef(
     ref
   ) => {
     const bonesRef = useRef({});
-    const springsRef = useRef({});
+    const springsRef = useRef(null);
     const prevPosRef = useRef({ x: 0, y: 0, z: 0 });
     const velocityRef = useRef({ x: 0, y: 0, z: 0 });
     const lastTimeRef = useRef(performance.now());
+    const readyRef = useRef(false);
 
     useImperativeHandle(ref, () => ({
       updateBones: () => {
-        if (!characterBody) return;
+        if (!readyRef.current || !springsRef.current || !characterBody) return;
 
         const now = performance.now();
         const dt = Math.min((now - lastTimeRef.current) / 1000, 0.05);
         lastTimeRef.current = now;
 
-        // ── Calcul de la vélocité du personnage ──
         const cx = characterBody.position.x;
         const cy = characterBody.position.y;
-        const cz = characterBody.position.z;
 
         const vx = (cx - prevPosRef.current.x) / dt;
         const vy = (cy - prevPosRef.current.y) / dt;
 
-        // Lissage vélocité
         velocityRef.current.x = velocityRef.current.x * 0.7 + vx * 0.3;
         velocityRef.current.y = velocityRef.current.y * 0.7 + vy * 0.3;
 
-        prevPosRef.current = { x: cx, y: cy, z: cz };
+        prevPosRef.current = { x: cx, y: cy, z: characterBody.position.z };
 
         const velX = THREE.MathUtils.clamp(velocityRef.current.x, -15, 15);
         const velY = THREE.MathUtils.clamp(velocityRef.current.y, -15, 15);
 
-        const springs = springsRef.current;
+        const sp = springsRef.current;
 
-        // ── Targets des springs selon la vélocité ──
+        // Targets selon vélocité
+        sp.bodyLeanZ.target      = -velX * 0.03;
+        sp.bodyLeanX.target      =  velY * 0.02;
+        sp.bodyStretchY.target   = -Math.abs(velY) * 0.003;
+        sp.headLagZ.target       = -velX * 0.05;
+        sp.headBobY.target       = -Math.abs(velX) * 0.015;
+        sp.leftArmSwing.target   =  velX * 0.08;
+        sp.rightArmSwing.target  = -velX * 0.08;
+        sp.armsDropY.target      = -Math.abs(velX) * 0.02 + velY * 0.03;
+        sp.leftForeSwing.target  =  velX * 0.05;
+        sp.rightForeSwing.target = -velX * 0.05;
+        sp.leftLegSwing.target   = -velX * 0.04;
+        sp.rightLegSwing.target  =  velX * 0.04;
+        sp.legsSquash.target     = -Math.abs(velY) * 0.025;
 
-        // Inclinaison du corps (lean)
-        springs.bodyLeanZ.target = -velX * 0.025;   // penche dans direction mouvement X
-        springs.bodyLeanX.target =  velY * 0.02;    // penche selon Y (saut/chute)
-        springs.bodyStretchY.target = -Math.abs(velY) * 0.003; // légère compression
+        for (const key in sp) sp[key].update(dt);
 
-        // Tête : lag derrière le mouvement
-        springs.headLagX.target = -velX * 0.04;
-        springs.headBobY.target = -Math.abs(velX) * 0.015;
+        const b = bonesRef.current;
 
-        // Bras : ballottent dans la direction opposée
-        springs.leftArmSwing.target  =  velX * 0.06;
-        springs.rightArmSwing.target = -velX * 0.06;
-        springs.armsDropY.target     = -Math.abs(velX) * 0.02 + velY * 0.03;
-
-        // Avant-bras : suivent avec un délai
-        springs.leftForeSwing.target  =  velX * 0.04;
-        springs.rightForeSwing.target = -velX * 0.04;
-
-        // Jambes : oscillent en opposition
-        springs.leftLegSwing.target  = -velX * 0.03;
-        springs.rightLegSwing.target =  velX * 0.03;
-        springs.legsSquash.target    = -Math.abs(velY) * 0.025;
-
-        // Update tous les springs
-        for (const key in springs) {
-          springs[key].update(dt);
+        // Corps
+        if (b.spine) {
+          b.spine.rotation.z = sp.bodyLeanZ.value;
+          b.spine.rotation.x = sp.bodyLeanX.value;
+          b.spine.scale.y    = 1 + sp.bodyStretchY.value;
         }
 
-        // ── Application sur les bones ──
-        const bones = bonesRef.current;
-
-        // CORPS (spine/body)
-        if (bones.spine) {
-          bones.spine.rotation.z = springs.bodyLeanZ.value;
-          bones.spine.rotation.x = springs.bodyLeanX.value;
-          bones.spine.scale.y = 1 + springs.bodyStretchY.value;
+        // Tête
+        if (b.head) {
+          b.head.rotation.z = sp.headLagZ.value;
+          b.head.rotation.y = -sp.headLagZ.value * 0.5;
+          b.head.position.y = (b.head.userData.restY || 0) + sp.headBobY.value;
         }
 
-        // TÊTE
-        if (bones.head) {
-          bones.head.rotation.z = springs.headLagX.value;
-          bones.head.rotation.y = -springs.headLagX.value * 0.5;
-          bones.head.position.y = (bones.head.userData.restY || 0) + springs.headBobY.value;
+        // Bras gauche upper
+        if (b.leftArmTop) {
+          b.leftArmTop.rotation.z = (b.leftArmTop.userData.restZ || 0) + sp.leftArmSwing.value;
+          b.leftArmTop.rotation.x = (b.leftArmTop.userData.restX || 0) + sp.armsDropY.value;
+        }
+        // Avant-bras gauche
+        if (b.leftArmBottom) {
+          b.leftArmBottom.rotation.z = (b.leftArmBottom.userData.restZ || 0) + sp.leftForeSwing.value;
         }
 
-        // BRAS GAUCHE (upper)
-        if (bones.leftArmTop) {
-          bones.leftArmTop.rotation.z = (bones.leftArmTop.userData.restZ || 0) + springs.leftArmSwing.value;
-          bones.leftArmTop.rotation.y = springs.armsDropY.value;
+        // Bras droit upper
+        if (b.rightArmTop) {
+          b.rightArmTop.rotation.z = (b.rightArmTop.userData.restZ || 0) + sp.rightArmSwing.value;
+          b.rightArmTop.rotation.x = (b.rightArmTop.userData.restX || 0) - sp.armsDropY.value;
         }
-        // AVANT-BRAS GAUCHE
-        if (bones.leftArmBottom) {
-          bones.leftArmBottom.rotation.z = springs.leftForeSwing.value;
-        }
-
-        // BRAS DROIT (upper)
-        if (bones.rightArmTop) {
-          bones.rightArmTop.rotation.z = (bones.rightArmTop.userData.restZ || 0) + springs.rightArmSwing.value;
-          bones.rightArmTop.rotation.y = -springs.armsDropY.value;
-        }
-        // AVANT-BRAS DROIT
-        if (bones.rightArmBottom) {
-          bones.rightArmBottom.rotation.z = springs.rightForeSwing.value;
+        // Avant-bras droit
+        if (b.rightArmBottom) {
+          b.rightArmBottom.rotation.z = (b.rightArmBottom.userData.restZ || 0) + sp.rightForeSwing.value;
         }
 
-        // JAMBE GAUCHE
-        if (bones.leftLegTop) {
-          bones.leftLegTop.rotation.x = springs.leftLegSwing.value;
-        }
-        if (bones.leftLegBottom) {
-          bones.leftLegBottom.rotation.x = springs.legsSquash.value;
-        }
-
-        // JAMBE DROITE
-        if (bones.rightLegTop) {
-          bones.rightLegTop.rotation.x = springs.rightLegSwing.value;
-        }
-        if (bones.rightLegBottom) {
-          bones.rightLegBottom.rotation.x = -springs.legsSquash.value;
-        }
+        // Jambes
+        if (b.leftLegTop)     b.leftLegTop.rotation.x     = (b.leftLegTop.userData.restX || 0)     + sp.leftLegSwing.value;
+        if (b.leftLegBottom)  b.leftLegBottom.rotation.x  = (b.leftLegBottom.userData.restX || 0)  + sp.legsSquash.value;
+        if (b.rightLegTop)    b.rightLegTop.rotation.x    = (b.rightLegTop.userData.restX || 0)    + sp.rightLegSwing.value;
+        if (b.rightLegBottom) b.rightLegBottom.rotation.x = (b.rightLegBottom.userData.restX || 0) - sp.legsSquash.value;
       },
     }));
 
     useEffect(() => {
       if (!model || !world || !characterBody) return;
 
-      // ── Récupérer le skeleton ──
       let skeleton;
       model.traverse((o) => {
         if (o.isSkinnedMesh && o.skeleton) skeleton = o.skeleton;
       });
       if (!skeleton) return;
 
-      console.log("Bones:", skeleton.bones.map((b) => b.name));
-
-      const findBone = (names) => {
+      const findBone = (...names) => {
         for (const name of names) {
           const b = skeleton.getBoneByName(name);
           if (b) return b;
@@ -172,62 +140,75 @@ const Skeleton = forwardRef(
         return null;
       };
 
-      // ── Assigner les bones ──
-      bonesRef.current.spine         = findBone(["body"]);
-      bonesRef.current.head          = findBone(["head"]);
-      bonesRef.current.leftLegTop    = findBone(["leg-topl"]);
-      bonesRef.current.leftLegBottom = findBone(["leg-bottoml"]);
-      bonesRef.current.rightLegTop   = findBone(["leg-topr"]);
-      bonesRef.current.rightLegBottom= findBone(["leg-bottomr"]);
-      bonesRef.current.leftArmTop    = findBone(["for-arm-topl", "first-arm-topl"]);
-      bonesRef.current.leftArmBottom = findBone(["for-arm-bottoml", "first-arm-bottoml"]);
-      bonesRef.current.rightArmTop   = findBone(["for-arm-topr", "first-arm-topr"]);
-      bonesRef.current.rightArmBottom= findBone(["for-arm-bottomr", "first-arm-bottomr"]);
+      const b = bonesRef.current;
 
-      // Props passées depuis App.jsx (bones spring animés)
-      if (headBone)        bonesRef.current.head         = headBone;
-      if (leftArmBone)     bonesRef.current.leftArmBottom= leftArmBone;
-      if (rightArmBone)    bonesRef.current.rightArmBottom= rightArmBone;
-      if (leftArmBoneTop)  bonesRef.current.leftArmTop   = leftArmBoneTop;
-      if (rightArmBoneTop) bonesRef.current.rightArmTop  = rightArmBoneTop;
+      // ✅ Noms exacts vus dans la console
+      b.spine          = findBone("body");
+      b.head           = findBone("head");
+      b.neck           = findBone("neck");
 
-      // ── Sauvegarder les positions de repos ──
-      for (const key in bonesRef.current) {
-        const bone = bonesRef.current[key];
-        if (!bone) continue;
-        bone.userData.restY = bone.position.y;
-        bone.userData.restZ = bone.rotation.z;
-        bone.userData.restX = bone.rotation.x;
+      // Jambes — noms confirmés dans la console
+      b.leftLegTop     = findBone("leg-topl");
+      b.leftLegBottom  = findBone("leg-bottoml");
+      b.rightLegTop    = findBone("leg-topr");
+      b.rightLegBottom = findBone("leg-bottomr");
+
+      // Bras — noms confirmés dans la console
+      // upper arm = "for-arm-top" ou "first-arm-top"
+      b.leftArmTop     = findBone("for-arm-topl", "first-arm-topl", "inside-arm-topl");
+      b.leftArmBottom  = findBone("for-arm-bottoml", "first-arm-bottoml");
+      b.rightArmTop    = findBone("for-arm-topr", "first-arm-topr", "inside-arm-topr");
+      b.rightArmBottom = findBone("for-arm-bottomr", "first-arm-bottomr");
+
+      // Overrides depuis App.jsx
+      if (headBone)        b.head          = headBone;
+      if (leftArmBoneTop)  b.leftArmTop    = leftArmBoneTop;
+      if (leftArmBone)     b.leftArmBottom = leftArmBone;
+      if (rightArmBoneTop) b.rightArmTop   = rightArmBoneTop;
+      if (rightArmBone)    b.rightArmBottom= rightArmBone;
+
+      // ✅ Sauvegarder rotations de repos pour toujours repartir de la bonne pose
+      for (const key in b) {
+        if (!b[key]) continue;
+        b[key].userData.restY = b[key].position.y;
+        b[key].userData.restZ = b[key].rotation.z;
+        b[key].userData.restX = b[key].rotation.x;
       }
 
-      // ── Initialiser les springs ──
+      console.log("✅ Bones assignés:", Object.fromEntries(
+        Object.entries(b).map(([k, v]) => [k, v ? `✅ ${v.name}` : "❌ NOT FOUND"])
+      ));
+
+      // ✅ Init springs
       const S = (s, d) => new Spring(s, d);
       springsRef.current = {
-        bodyLeanZ:     S(6,  0.55),
-        bodyLeanX:     S(5,  0.55),
-        bodyStretchY:  S(10, 0.6),
-        headLagX:      S(4,  0.5),
-        headBobY:      S(8,  0.6),
-        leftArmSwing:  S(4,  0.45),
-        rightArmSwing: S(4,  0.45),
-        armsDropY:     S(5,  0.5),
-        leftForeSwing: S(3,  0.4),
-        rightForeSwing:S(3,  0.4),
-        leftLegSwing:  S(5,  0.5),
-        rightLegSwing: S(5,  0.5),
-        legsSquash:    S(8,  0.6),
+        bodyLeanZ:      S(6,  0.55),
+        bodyLeanX:      S(5,  0.55),
+        bodyStretchY:   S(10, 0.6),
+        headLagZ:       S(4,  0.5),
+        headBobY:       S(8,  0.6),
+        leftArmSwing:   S(4,  0.45),
+        rightArmSwing:  S(4,  0.45),
+        armsDropY:      S(5,  0.5),
+        leftForeSwing:  S(3,  0.4),
+        rightForeSwing: S(3,  0.4),
+        leftLegSwing:   S(5,  0.5),
+        rightLegSwing:  S(5,  0.5),
+        legsSquash:     S(8,  0.6),
       };
 
-      // Init position précédente
       prevPosRef.current = {
         x: characterBody.position.x,
         y: characterBody.position.y,
         z: characterBody.position.z,
       };
 
+      readyRef.current = true;
+
       return () => {
+        readyRef.current = false;
+        springsRef.current = null;
         bonesRef.current = {};
-        springsRef.current = {};
       };
     }, [model, world, characterBody, headBone, leftArmBone, rightArmBone, leftArmBoneTop, rightArmBoneTop]);
 
