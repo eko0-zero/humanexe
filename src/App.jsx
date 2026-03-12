@@ -192,6 +192,14 @@ const App = () => {
   const draggingItemRef = useRef(null); // item actuellement drag & drop
   const dragOffset = useRef(new THREE.Vector3()); // offset souris → centre
   const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projection
+  const skeletonRef = useRef(null);
+
+  // Bone refs
+  const headBoneRef = useRef(null);
+  const leftArmBoneRef = useRef(null);
+  const rightArmBoneRef = useRef(null);
+  const leftArmBoneTopRef = useRef(null);
+  const rightArmBoneTopRef = useRef(null);
 
   const meshRef = useRef(null); // ← ref pour le mesh du personnage
   const characterBodyRef = useRef(null); // ← ref pour le corps physique
@@ -245,6 +253,19 @@ const App = () => {
         characterBody.position.y + MODEL_Y_OFFSET,
         characterBody.position.z,
       );
+      // Get skeleton and assign bone refs
+      const skeleton = model.getObjectByProperty(
+        "type",
+        "SkinnedMesh",
+      )?.skeleton;
+      if (skeleton) {
+        headBoneRef.current =
+          skeleton.getBoneByName("head") || skeleton.getBoneByName("Head");
+        leftArmBoneRef.current = skeleton.getBoneByName("leftArm");
+        rightArmBoneRef.current = skeleton.getBoneByName("rightArm");
+        leftArmBoneTopRef.current = skeleton.getBoneByName("leftArmTop");
+        rightArmBoneTopRef.current = skeleton.getBoneByName("rightArmTop");
+      }
     });
 
     renderer.render(scene, camera);
@@ -418,6 +439,8 @@ const App = () => {
 
       world.step(1 / 60, dt, 3);
 
+      skeletonRef.current?.updateBones();
+
       // Apply viewport limits even when not dragging
       clampByModelEdges();
 
@@ -522,13 +545,19 @@ const App = () => {
           renderer={rendererRef.current}
         />
       )}
-      <Skeleton
-        scene={sceneRef.current}
-        world={worldRef.current}
-        camera={cameraRef.current}
-        renderer={rendererRef.current}
-        characterBody={characterBodyRef.current}
-      />
+      {meshRef.current && (
+        <Skeleton
+          ref={skeletonRef}
+          model={meshRef.current}
+          world={worldRef.current}
+          characterBody={characterBodyRef.current}
+          headBone={headBoneRef.current}
+          leftArmBone={leftArmBoneRef.current}
+          rightArmBone={rightArmBoneRef.current}
+          leftArmBoneTop={leftArmBoneTopRef.current}
+          rightArmBoneTop={rightArmBoneTopRef.current}
+        />
+      )}
       <canvas ref={canvasRef}></canvas>
     </main>
   );
