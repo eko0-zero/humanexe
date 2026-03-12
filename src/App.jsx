@@ -14,7 +14,6 @@ const MODEL_PATH = "./3D/models/character.glb";
 const GROUND_Y = -1;
 const MODEL_Y_OFFSET = -0.5;
 
-
 // ─────────────────────────────────────────────
 // HELPERS — scène Three.js
 // ─────────────────────────────────────────────
@@ -190,10 +189,10 @@ const App = () => {
   const worldRef = useRef(null);
   const spawnedItemsRef = useRef([]);
   const draggingItemRef = useRef(null); // item actuellement drag & drop
-const dragOffset = useRef(new THREE.Vector3()); // offset souris → centre
-const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projection
-  
- const meshRef = useRef(null);          // ← ref pour le mesh du personnage
+  const dragOffset = useRef(new THREE.Vector3()); // offset souris → centre
+  const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projection
+
+  const meshRef = useRef(null); // ← ref pour le mesh du personnage
   const characterBodyRef = useRef(null); // ← ref pour le corps physique
 
   const [ready, setReady] = useState(false); // ← AJOUTE CETTE LIGNE
@@ -222,6 +221,7 @@ const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projec
 
     const characterBody = createCharacterBody(GROUND_Y + 2);
     world.addBody(characterBody);
+    characterBodyRef.current = characterBody;
 
     // ── Modèle ──
     const placeholder = createPlaceholderCube(scene);
@@ -236,6 +236,7 @@ const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projec
 
     loadModel(scene, placeholder).then((model) => {
       mesh = model;
+      meshRef.current = mesh;
       const box = new THREE.Box3().setFromObject(mesh);
       box.getSize(modelSize);
       mesh.position.set(
@@ -416,6 +417,16 @@ const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projec
 
       world.step(1 / 60, dt, 3);
 
+      // Apply viewport limits even when not dragging
+      clampByModelEdges();
+
+      // Prevent character from going under the ground
+      const minY = GROUND_Y + 0.5;
+      if (characterBody.position.y < minY) {
+        characterBody.position.y = minY;
+        characterBody.velocity.y = 0;
+      }
+
       if (mesh) {
         mesh.position.set(
           characterBody.position.x,
@@ -474,33 +485,33 @@ const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projec
       <p className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
         Click on “space” or “esc” to open the menu.
       </p>
-<ButtonAddItem
-  scene={sceneRef.current}
-  world={worldRef.current}
-  camera={cameraRef.current}
-  renderer={rendererRef.current}
-  spawnedItems={spawnedItemsRef}
-  characterBody={characterBodyRef.current} // ← on passe maintenant le ref
-  getViewBounds={() => {
-    const camera = cameraRef.current;
-    const mesh = meshRef.current;
+      <ButtonAddItem
+        scene={sceneRef.current}
+        world={worldRef.current}
+        camera={cameraRef.current}
+        renderer={rendererRef.current}
+        spawnedItems={spawnedItemsRef}
+        characterBody={characterBodyRef.current} // ← on passe maintenant le ref
+        getViewBounds={() => {
+          const camera = cameraRef.current;
+          const mesh = meshRef.current;
 
-    if (!camera || !mesh) {
-      return { halfW: 5, halfH: 5 };
-    }
+          if (!camera || !mesh) {
+            return { halfW: 5, halfH: 5 };
+          }
 
-    const distance = camera.position.z - mesh.position.z;
-    const vFov = THREE.MathUtils.degToRad(camera.fov);
+          const distance = camera.position.z - mesh.position.z;
+          const vFov = THREE.MathUtils.degToRad(camera.fov);
 
-    const viewHeight = 2 * Math.tan(vFov / 2) * distance;
-    const viewWidth = viewHeight * camera.aspect;
+          const viewHeight = 2 * Math.tan(vFov / 2) * distance;
+          const viewWidth = viewHeight * camera.aspect;
 
-    return {
-      halfW: viewWidth / 2,
-      halfH: viewHeight / 2,
-    };
-  }}
-/>
+          return {
+            halfW: viewWidth / 2,
+            halfH: viewHeight / 2,
+          };
+        }}
+      />
       {ready && (
         <Trash
           scene={sceneRef.current}
