@@ -122,11 +122,7 @@ export default function Trash({
       const trashPos = trashRef.current.position;
       const trashSize = trashBoundsRef.current.size;
 
-      const trashRadius = Math.max(
-        trashSize.x,
-        trashSize.y,
-        trashSize.z,
-      ) / 2;
+      const trashRadius = Math.max(trashSize.x, trashSize.y, trashSize.z) / 2;
 
       for (let i = spawnedItems.current.length - 1; i >= 0; i--) {
         const item = spawnedItems.current[i];
@@ -167,11 +163,9 @@ export default function Trash({
 
       const rect = renderer.domElement.getBoundingClientRect();
 
-      mouseRef.current.x =
-        ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
 
-      mouseRef.current.y =
-        -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      mouseRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycasterRef.current.setFromCamera(mouseRef.current, camera);
 
