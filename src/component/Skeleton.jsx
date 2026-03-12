@@ -26,17 +26,69 @@ const Skeleton = forwardRef(
     const bodiesRef = useRef({});
     const constraintsRef = useRef([]);
 
+    // 6️⃣ Expose updateBones function to parent for manual update
+    useImperativeHandle(ref, () => ({
+      updateBones: () => {
+        for (const key in bonesRef.current) {
+          // skip bones controlled by spring animation (arms and head)
+          if (
+            key === "head" ||
+            key === "leftArm" ||
+            key === "rightArm" ||
+            key === "leftArmTop" ||
+            key === "rightArmTop"
+          )
+            continue;
+
+          const bone = bonesRef.current[key];
+          const body = bodiesRef.current[key];
+          if (!bone || !body) continue;
+          const parent = bone.parent;
+          if (parent) parent.updateWorldMatrix(true, false);
+
+          if (parent) {
+            const parentInv = new THREE.Matrix4()
+              .copy(parent.matrixWorld)
+              .invert();
+
+            const worldMatrix = new THREE.Matrix4().compose(
+              new THREE.Vector3(
+                body.position.x,
+                body.position.y,
+                body.position.z,
+              ),
+              new THREE.Quaternion(
+                body.quaternion.x,
+                body.quaternion.y,
+                body.quaternion.z,
+                body.quaternion.w,
+              ),
+              new THREE.Vector3(1, 1, 1),
+            );
+
+            const localMatrix = worldMatrix.premultiply(parentInv);
+
+            const scale = new THREE.Vector3();
+            localMatrix.decompose(bone.position, bone.quaternion, scale);
+          } else {
+            bone.position.copy(body.position);
+            bone.quaternion.copy(body.quaternion);
+          }
+          bone.updateMatrixWorld(true);
+        }
+      },
+    }));
     useEffect(() => {
-      console.log(model, world, characterBody);
       if (!model || !world || !characterBody) return;
 
       // 1️⃣ Récupération du skeleton
       let skeleton;
+
       model.traverse((o) => {
         if (o.isSkinnedMesh && o.skeleton) skeleton = o.skeleton;
       });
       if (!skeleton) return;
-      console.log(skeleton.getBones());
+      console.log(skeleton.bones.map((b) => b.name));
 
       // 2️⃣ Trouver un bone par noms possibles
       const findBone = (names) => {
@@ -49,10 +101,22 @@ const Skeleton = forwardRef(
 
       const boneNames = {
         spine: ["body"],
-        rightLegTop: ["leg-top.r"],
-        rightLegBottom: ["leg-bottom.r"],
-        leftLegTop: ["leg-top.l"],
-        leftLegBottom: ["leg-bottom.l"],
+        rightLegTop: ["leg-topr"],
+        rightLegBottom: ["leg-bottomr"],
+        leftLegTop: ["leg-topl"],
+        leftLegBottom: ["leg-bottoml"],
+
+        head: ["head"],
+
+        rightArmTop: ["for-arm-topr"],
+        rightArmBottom: ["for-arm-bottomr"],
+        leftArmTop: ["for-arm-topl"],
+        leftArmBottom: ["for-arm-bottoml"],
+
+        rightForArmTop: ["first-arm-topr"],
+        rightArmBottom: ["first-arm-bottomr"],
+        leftForArmTop: ["first-arm-topl"],
+        leftArmBottom: ["first-arm-bottoml"],
       };
 
       for (const key in boneNames) {
@@ -150,59 +214,6 @@ const Skeleton = forwardRef(
       if (rightArmBone) bonesRef.current.rightArm = rightArmBone;
       if (leftArmBoneTop) bonesRef.current.leftArmTop = leftArmBoneTop;
       if (rightArmBoneTop) bonesRef.current.rightArmTop = rightArmBoneTop;
-
-      // 6️⃣ Expose updateBones function to parent for manual update
-      useImperativeHandle(ref, () => ({
-        updateBones: () => {
-          for (const key in bonesRef.current) {
-            // skip bones controlled by spring animation (arms and head)
-            if (
-              key === "head" ||
-              key === "leftArm" ||
-              key === "rightArm" ||
-              key === "leftArmTop" ||
-              key === "rightArmTop"
-            )
-              continue;
-
-            const bone = bonesRef.current[key];
-            const body = bodiesRef.current[key];
-            if (!bone || !body) continue;
-            const parent = bone.parent;
-            if (parent) parent.updateWorldMatrix(true, false);
-
-            if (parent) {
-              const parentInv = new THREE.Matrix4()
-                .copy(parent.matrixWorld)
-                .invert();
-
-              const worldMatrix = new THREE.Matrix4().compose(
-                new THREE.Vector3(
-                  body.position.x,
-                  body.position.y,
-                  body.position.z,
-                ),
-                new THREE.Quaternion(
-                  body.quaternion.x,
-                  body.quaternion.y,
-                  body.quaternion.z,
-                  body.quaternion.w,
-                ),
-                new THREE.Vector3(1, 1, 1),
-              );
-
-              const localMatrix = worldMatrix.premultiply(parentInv);
-
-              const scale = new THREE.Vector3();
-              localMatrix.decompose(bone.position, bone.quaternion, scale);
-            } else {
-              bone.position.copy(body.position);
-              bone.quaternion.copy(body.quaternion);
-            }
-            bone.updateMatrixWorld(true);
-          }
-        },
-      }));
 
       return () => {
         // cleanup constraints and bodies

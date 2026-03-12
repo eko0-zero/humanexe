@@ -205,6 +205,7 @@ const App = () => {
   const characterBodyRef = useRef(null); // ← ref pour le corps physique
 
   const [ready, setReady] = useState(false); // ← AJOUTE CETTE LIGNE
+  const [model, setModel] = useState(null); // ← AJOUTE CETTE LIGNE
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -266,6 +267,7 @@ const App = () => {
         leftArmBoneTopRef.current = skeleton.getBoneByName("leftArmTop");
         rightArmBoneTopRef.current = skeleton.getBoneByName("rightArmTop");
       }
+      setModel(model);
     });
 
     renderer.render(scene, camera);
@@ -545,10 +547,10 @@ const App = () => {
           renderer={rendererRef.current}
         />
       )}
-      {meshRef.current && (
+      {model && (
         <Skeleton
           ref={skeletonRef}
-          model={meshRef.current}
+          model={model}
           world={worldRef.current}
           characterBody={characterBodyRef.current}
           headBone={headBoneRef.current}
