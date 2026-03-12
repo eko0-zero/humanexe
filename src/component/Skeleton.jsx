@@ -1,165 +1,149 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { World, Vec3, Body, Plane, Box } from "cannon-es";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import {
+  Body,
+  Box,
+  Vec3,
+  HingeConstraint,
+  PointToPointConstraint,
+} from "cannon-es";
 
-let isModelReady = false;
-let animationManager = null;
-let headBody = null;
-let rightArmBody = null;
-let leftArmBody = null;
-let bonePhysicsStarted = false;
+const Skeleton = ({ model, world, characterBody }) => {
+  const bonesRef = useRef({});
+  const bodiesRef = useRef({});
+  const constraintsRef = useRef([]);
 
-// Helper to find a bone by trying several possible names
-function findBone(skeleton, names) {
-  for (const name of names) {
-    const b = skeleton.getBoneByName(name);
-    if (b) return b;
-  }
+  useEffect(() => {
+    if (!model || !world || !characterBody) return;
 
-  // fallback: case-insensitive search
-  const lower = names.map((n) => n.toLowerCase());
-  return skeleton.bones.find((b) => lower.includes(b.name.toLowerCase()));
-}
-
-loadModel(scene, placeholder)
-  .then((model) => {
-    mesh = model;
-    meshRef.current = mesh;
-    const box = new THREE.Box3().setFromObject(mesh);
-    box.getSize(modelSize);
-    modelSizeRef.current.copy(modelSize);
-
-    mesh.traverse((o) => {
-      if (o.isSkinnedMesh && o.skeleton) {
-        skeleton = o.skeleton;
-      }
+    // 1️⃣ Récupération du skeleton
+    let skeleton;
+    model.traverse((o) => {
+      if (o.isSkinnedMesh && o.skeleton) skeleton = o.skeleton;
     });
+    if (!skeleton) return;
 
-    if (skeleton) {
-      console.log(
-        "Skeleton bones:",
-        skeleton.bones.map((b) => b.name),
-      );
-
-      // torso / reference bone
-      testBone = findBone(skeleton, ["body"]);
-
-      // head
-      headBone = findBone(skeleton, ["head"]);
-      skeleton.bones[0];
-
-      // right arm
-      ForRightArmBoneTop = findBone(skeleton, ["for-arm-top.r"]);
-      rightArmBoneTop = findBone(skeleton, ["first-arm-top.r"]);
-
-      rightArmBoneBottom = findBone(skeleton, [
-        "for-arm-bottom.r",
-        "first-arm-bottom.r",
-      ]);
-
-      // left arm
-      ForLeftArmBoneTop = findBone(skeleton, ["for-arm-top.l"]);
-      leftArmBoneTop = findBone(skeleton, ["first-arm-top.l"]);
-
-      leftArmBoneBottom = findBone(skeleton, [
-        "for-arm-bottom.l",
-        "first-arm-bottom.l",
-      ]);
-
-      // legs
-      rightLegTop = findBone(skeleton, ["leg-top.r"]);
-      rightLegBottom = findBone(skeleton, ["leg-bottom.r"]);
-      leftLegTop = findBone(skeleton, ["leg-top.l"]);
-      leftLegBottom = findBone(skeleton, ["leg-bottom.l"]);
-
-      // store rest rotations for animation reset
-      if (leftArmBone) leftArmRest.copy(leftArmBone.rotation);
-      if (leftArmBoneTop) leftArmRestTop.copy(leftArmBoneTop.rotation);
-      if (rightArmBone) rightArmRest.copy(rightArmBone.rotation);
-      if (rightArmBoneTop) rightArmRestTop.copy(rightArmBoneTop.rotation);
-
-      // --- Basic physics bodies for some bones (simple ragdoll start) ---
-      if (typeof world !== "undefined") {
-        if (headBone) {
-          headBody = new Body({
-            mass: 0.5,
-            shape: new Box(new Vec3(0.15, 0.15, 0.15)),
-          });
-          world.addBody(headBody);
-        }
-
-        if (rightArmBoneTop) {
-          rightArmBody = new Body({
-            mass: 0.3,
-            shape: new Box(new Vec3(0.12, 0.25, 0.12)),
-          });
-          world.addBody(rightArmBody);
-        }
-
-        if (leftArmBoneTop) {
-          leftArmBody = new Body({
-            mass: 0.3,
-            shape: new Box(new Vec3(0.12, 0.25, 0.12)),
-          });
-          world.addBody(leftArmBody);
-        }
-
-        if (!bonePhysicsStarted) {
-          bonePhysicsStarted = true;
-
-          const updateBonePhysics = () => {
-            if (headBone && headBody) {
-              headBody.position.copy(
-                headBone.getWorldPosition(new THREE.Vector3()),
-              );
-              headBone.position.copy(headBody.position);
-            }
-
-            if (rightArmBoneTop && rightArmBody) {
-              rightArmBody.position.copy(
-                rightArmBoneTop.getWorldPosition(new THREE.Vector3()),
-              );
-              rightArmBoneTop.position.copy(rightArmBody.position);
-            }
-
-            if (leftArmBoneTop && leftArmBody) {
-              leftArmBody.position.copy(
-                leftArmBoneTop.getWorldPosition(new THREE.Vector3()),
-              );
-              leftArmBoneTop.position.copy(leftArmBody.position);
-            }
-
-            requestAnimationFrame(updateBonePhysics);
-          };
-
-          updateBonePhysics();
-        }
+    // 2️⃣ Trouver un bone par noms possibles
+    const findBone = (names) => {
+      for (const name of names) {
+        const bone = skeleton.getBoneByName(name);
+        if (bone) return bone;
       }
+      return null;
+    };
+
+    const boneNames = {
+      head: ["Head", "head", "mixamorigHead"],
+      spine: ["Spine", "spine", "Chest"],
+      rightArmTop: ["RightArmTop", "upper_arm.R", "Arm_R"],
+      rightArmBottom: ["RightArmBottom", "lower_arm.R"],
+      leftArmTop: ["LeftArmTop", "upper_arm.L", "Arm_L"],
+      leftArmBottom: ["LeftArmBottom", "lower_arm.L"],
+      rightLegTop: ["RightLegTop", "upper_leg.R"],
+      rightLegBottom: ["RightLegBottom", "lower_leg.R"],
+      leftLegTop: ["LeftLegTop", "upper_leg.L"],
+      leftLegBottom: ["LeftLegBottom", "lower_leg.L"],
+    };
+
+    for (const key in boneNames) {
+      bonesRef.current[key] = findBone(boneNames[key]);
     }
 
-    mesh.position.set(
-      characterBody.position.x,
-      characterBody.position.y + MODEL_Y_OFFSET,
-      characterBody.position.z,
+    // 3️⃣ Créer bodies Cannon.js pour chaque bone
+    const createBody = (bone, mass = 0.5) => {
+      if (!bone) return null;
+      const box = new THREE.Box3().setFromObject(bone);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const halfExtents = new Vec3(size.x / 2, size.y / 2, size.z / 2);
+      const body = new Body({ mass });
+      body.addShape(new Box(halfExtents));
+      const pos = new THREE.Vector3();
+      bone.getWorldPosition(pos);
+      body.position.copy(pos);
+      world.addBody(body);
+      return body;
+    };
+
+    for (const key in bonesRef.current) {
+      bodiesRef.current[key] = createBody(
+        bonesRef.current[key],
+        key.includes("Leg") ? 0.4 : 0.3,
+      );
+    }
+
+    // 4️⃣ Lier le characterBody au spine
+    const spineBody = bodiesRef.current["spine"];
+    if (spineBody) {
+      const constraint = new PointToPointConstraint(
+        characterBody,
+        new Vec3(0, 0, 0),
+        spineBody,
+        new Vec3(0, 0, 0),
+      );
+      world.addConstraint(constraint);
+    }
+
+    // 5️⃣ Ajouter contraintes entre bones (bras, jambes, tête)
+    const addHinge = (A, B, pA, pB, axis = new Vec3(1, 0, 0)) => {
+      const bodyA = bodiesRef.current[A];
+      const bodyB = bodiesRef.current[B];
+      if (!bodyA || !bodyB) return;
+      const hinge = new HingeConstraint(bodyA, bodyB, {
+        pivotA: pA,
+        pivotB: pB,
+        axisA: axis,
+        axisB: axis,
+      });
+      world.addConstraint(hinge);
+      constraintsRef.current.push(hinge);
+    };
+
+    addHinge("head", "rightArmTop", new Vec3(0, -0.1, 0), new Vec3(0, 0.15, 0));
+    addHinge("head", "leftArmTop", new Vec3(0, -0.1, 0), new Vec3(0, 0.15, 0));
+    addHinge(
+      "rightArmTop",
+      "rightArmBottom",
+      new Vec3(0, -0.15, 0),
+      new Vec3(0, 0.15, 0),
+    );
+    addHinge(
+      "leftArmTop",
+      "leftArmBottom",
+      new Vec3(0, -0.15, 0),
+      new Vec3(0, 0.15, 0),
+    );
+    addHinge(
+      "rightLegTop",
+      "rightLegBottom",
+      new Vec3(0, -0.3, 0),
+      new Vec3(0, 0.3, 0),
+    );
+    addHinge(
+      "leftLegTop",
+      "leftLegBottom",
+      new Vec3(0, -0.3, 0),
+      new Vec3(0, 0.3, 0),
     );
 
-    // === ✅ INITIALISER ANIMATIONMANAGER APRÈS QUE LE MODÈLE SOIT CHARGÉ ===
-    animationManager = new AnimationManager(
-      scene,
-      mesh,
-      skeleton,
-      healthManager,
-    );
-    animationManagerRef.current = animationManager;
-    isModelReady = true; // ✅ MARQUER QUE LE MODÈLE EST PRÊT
+    // 6️⃣ Synchroniser bones avec bodies
+    let animId;
+    const updateBones = () => {
+      for (const key in bonesRef.current) {
+        const bone = bonesRef.current[key];
+        const body = bodiesRef.current[key];
+        if (!bone || !body) continue;
+        bone.position.copy(body.position);
+        bone.quaternion.copy(body.quaternion);
+      }
+      animId = requestAnimationFrame(updateBones);
+    };
+    updateBones();
 
-    console.log("✅ Modèle principal chargé et AnimationManager initialisé");
-    setIsReady(true);
-  })
-  .catch((err) => {
-    console.error("Erreur chargement modèle principal:", err);
-    setIsReady(true);
-  });
+    return () => cancelAnimationFrame(animId);
+  }, [model, world, characterBody]);
 
-renderer.render(scene, camera);
+  return null;
+};
+
+export default Skeleton;

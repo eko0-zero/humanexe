@@ -5,6 +5,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import "./index.css";
 import Trash from "./component/trash.jsx";
 import ButtonAddItem from "./component/ButtonAddItems.jsx";
+import Skeleton from "./component/Skeleton.jsx";
 
 // ─────────────────────────────────────────────
 // CONSTANTES
@@ -521,6 +522,13 @@ const App = () => {
           renderer={rendererRef.current}
         />
       )}
+      <Skeleton
+        scene={sceneRef.current}
+        world={worldRef.current}
+        camera={cameraRef.current}
+        renderer={rendererRef.current}
+        characterBody={characterBodyRef.current}
+      />
       <canvas ref={canvasRef}></canvas>
     </main>
   );
