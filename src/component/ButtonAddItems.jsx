@@ -32,13 +32,18 @@ function ensureContactMaterial(world) {
 
 async function loadModel(path) {
   if (modelCache[path]) return modelCache[path];
+
   const gltf = await loader.loadAsync(path);
   gltf.scene.traverse((node) => {
     if (node.isMesh) {
       node.castShadow = true;
-      node.receiveShadow = true;
+      node.receiveShadow = false; // match App
+      node.material = node.material.clone();
+      node.material.shadowSide = THREE.FrontSide;
+      node.geometry.computeVertexNormals(); // corrige artefacts
     }
   });
+
   modelCache[path] = gltf.scene;
   return gltf.scene;
 }
@@ -239,7 +244,6 @@ export default function ButtonAddItem({ scene, world, spawnedItems, camera, rend
     if (!rendererRef.current || !scene || !cameraRef.current) return;
     const animate = () => {
       spawnedItems.current.forEach(item => {
-        // sécurise axe Z
         item.body.position.z = LOCKED_Z;
         item.body.velocity.z = 0;
         item.mesh.position.copy(item.body.position);
