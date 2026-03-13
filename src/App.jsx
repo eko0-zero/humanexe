@@ -15,6 +15,18 @@ const MODEL_PATH = "./3D/models/character.glb";
 const GROUND_Y = -1;
 const MODEL_Y_OFFSET = -0.5;
 
+// ── Eye flipbook ──
+const EYE_FRAME_COUNT = 247;
+const EYE_FPS = 25;
+const EYE_FRAME_DURATION = 1 / EYE_FPS; // secondes par frame
+
+// Génère le chemin : eye_001.png, eye_002.png... (padding 3 chiffres)
+// Si tes fichiers sont eye_1.png, eye_2.png, change padStart(3, "0") en just String(i + 1)
+const getEyeTexturePath = (index) => {
+  const padded = String(index + 1).padStart(3, "0");
+  return `./3D/textures/eyes/eyes-v1_${padded}.png`;
+};
+
 // ─────────────────────────────────────────────
 // HELPERS — scène Three.js
 // ─────────────────────────────────────────────
@@ -31,14 +43,8 @@ function createRenderer(canvas, width, height) {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.setClearColor(0xffffff);
   renderer.setSize(width, height);
-
-  // Improve rendering quality on high DPI screens
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
-
-  // Better color handling
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-  // Slightly better lighting response
   renderer.toneMapping = THREE.LinearToneMapping;
   renderer.toneMappingExposure = 1;
   return renderer;
@@ -78,15 +84,14 @@ function createGround(scene) {
 
 function createPlaceholderCube(scene) {
   const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const material = new THREE.MeshPhongMaterial({
-    color: 0xffffff,
-  });
+  const material = new THREE.MeshPhongMaterial({ color: 0xffffff });
   const cube = new THREE.Mesh(geometry, material);
   cube.castShadow = true;
   scene.add(cube);
   return cube;
 }
 
+// Retourne { model, animations }
 function loadModel(scene, placeholderCube) {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
@@ -110,7 +115,7 @@ function loadModel(scene, placeholderCube) {
 
         model.scale.set(1.4, 1.4, 1.4);
         scene.add(model);
-        resolve(model);
+        resolve({ model, animations: gltf.animations });
       },
       undefined,
       (error) => {
@@ -122,12 +127,62 @@ function loadModel(scene, placeholderCube) {
 }
 
 // ─────────────────────────────────────────────
+// HELPER — précharge toutes les textures des yeux
+// ─────────────────────────────────────────────
+function preloadEyeTextures() {
+  const loader = new THREE.TextureLoader();
+  const textures = [];
+
+  for (let i = 0; i < EYE_FRAME_COUNT; i++) {
+    const path = getEyeTexturePath(i);
+    const tex = loader.load(path, undefined, undefined, () =>
+      console.warn(`Texture introuvable : ${path}`),
+    );
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.flipY = false; // GLB utilise des UVs non-flippées
+    textures.push(tex);
+  }
+
+  console.log(`${EYE_FRAME_COUNT} textures yeux préchargées à ${EYE_FPS} fps`);
+  return textures;
+}
+
+// ─────────────────────────────────────────────
+// HELPER — trouve les meshes des yeux dans le modèle
+// ─────────────────────────────────────────────
+function findEyeMeshes(model) {
+  const eyeMeshes = [];
+  model.traverse((node) => {
+    if (node.isMesh) {
+      const name = node.name.toLowerCase();
+      if (
+        name.includes("eye") ||
+        name.includes("yeux") ||
+        name.includes("oeil") ||
+        name.includes("iris") ||
+        name.includes("pupil")
+      ) {
+        eyeMeshes.push(node);
+        console.log(`Mesh yeux trouvé : "${node.name}"`);
+      }
+    }
+  });
+
+  if (eyeMeshes.length === 0) {
+    console.warn("Aucun mesh yeux trouvé. Noms de meshes disponibles :");
+    model.traverse((node) => {
+      if (node.isMesh) console.log(" →", node.name);
+    });
+  }
+
+  return eyeMeshes;
+}
+
+// ─────────────────────────────────────────────
 // HELPERS — monde physique Cannon.js
 // ─────────────────────────────────────────────
 function createPhysicsWorld() {
-  const world = new World({
-    gravity: new Vec3(0, -9.82, 0),
-  });
+  const world = new World({ gravity: new Vec3(0, -9.82, 0) });
   world.solver.iterations = 10;
   return world;
 }
@@ -153,26 +208,19 @@ function createCharacterBody(startY) {
 // ─────────────────────────────────────────────
 // HELPER — projection souris → point 3D
 // ─────────────────────────────────────────────
-// Crée un plan perpendiculaire à la caméra passant par un point donné.
-// Puis on intersecte le rayon souris avec ce plan.
-// Marche peu importe la rotation de la caméra.
 function getMouseOnPlane(clientX, clientY, camera, renderer, planePoint) {
   const rect = renderer.domElement.getBoundingClientRect();
   const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
   const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-  // Rayon depuis la caméra vers la souris
   const ray = new THREE.Raycaster();
   ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
 
-  // Plan perpendiculaire à la caméra, passant par planePoint
-  // La normale du plan = direction où regarde la caméra
   const normal = new THREE.Vector3();
   camera.getWorldDirection(normal);
   const plane = new THREE.Plane();
   plane.setFromNormalAndCoplanarPoint(normal, planePoint);
 
-  // Intersection rayon ↔ plan
   const target = new THREE.Vector3();
   ray.ray.intersectPlane(plane, target);
 
@@ -189,10 +237,14 @@ const App = () => {
   const rendererRef = useRef(null);
   const worldRef = useRef(null);
   const spawnedItemsRef = useRef([]);
-  const draggingItemRef = useRef(null); // item actuellement drag & drop
-  const dragOffset = useRef(new THREE.Vector3()); // offset souris → centre
-  const dragPlanePoint = useRef(new THREE.Vector3()); // point de plan pour projection
   const skeletonRef = useRef(null);
+  const mixerRef = useRef(null);
+
+  // Eye flipbook
+  const eyeTexturesRef = useRef([]);
+  const eyeMeshesRef = useRef([]);
+  const eyeFrameRef = useRef(0); // index de la frame courante
+  const eyeTimeAccRef = useRef(0); // accumulateur de temps (secondes)
 
   // Bone refs
   const headBoneRef = useRef(null);
@@ -201,11 +253,12 @@ const App = () => {
   const leftArmBoneTopRef = useRef(null);
   const rightArmBoneTopRef = useRef(null);
 
-  const meshRef = useRef(null); // ← ref pour le mesh du personnage
-  const characterBodyRef = useRef(null); // ← ref pour le corps physique
+  const meshRef = useRef(null);
+  const characterBodyRef = useRef(null);
 
-  const [ready, setReady] = useState(false); // ← AJOUTE CETTE LIGNE
-  const [model, setModel] = useState(null); // ← AJOUTE CETTE LIGNE
+  const [ready, setReady] = useState(false);
+  const [model, setModel] = useState(null);
+
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -233,6 +286,9 @@ const App = () => {
     world.addBody(characterBody);
     characterBodyRef.current = characterBody;
 
+    // ── Précharge les textures des yeux ──
+    eyeTexturesRef.current = preloadEyeTextures();
+
     // ── Modèle ──
     const placeholder = createPlaceholderCube(scene);
     let mesh = placeholder;
@@ -244,17 +300,20 @@ const App = () => {
       characterBody.position.z,
     );
 
-    loadModel(scene, placeholder).then((model) => {
+    loadModel(scene, placeholder).then(({ model, animations }) => {
       mesh = model;
       meshRef.current = mesh;
+
       const box = new THREE.Box3().setFromObject(mesh);
       box.getSize(modelSize);
+
       mesh.position.set(
         characterBody.position.x,
         characterBody.position.y + MODEL_Y_OFFSET,
         characterBody.position.z,
       );
-      // Get skeleton and assign bone refs
+
+      // ── Bones ──
       const skeleton = model.getObjectByProperty(
         "type",
         "SkinnedMesh",
@@ -267,6 +326,35 @@ const App = () => {
         leftArmBoneTopRef.current = skeleton.getBoneByName("leftArmTop");
         rightArmBoneTopRef.current = skeleton.getBoneByName("rightArmTop");
       }
+
+      // ── Animations GLB en boucle ──
+      if (animations && animations.length > 0) {
+        const mixer = new THREE.AnimationMixer(model);
+        mixerRef.current = mixer;
+        animations.forEach((clip) => {
+          const action = mixer.clipAction(clip);
+          action.setLoop(THREE.LoopRepeat, Infinity);
+          action.play();
+        });
+        console.log(
+          `${animations.length} animation(s) lancée(s) :`,
+          animations.map((a) => a.name),
+        );
+      }
+
+      // ── Trouver les meshes des yeux ──
+      const eyeMeshes = findEyeMeshes(model);
+      eyeMeshesRef.current = eyeMeshes;
+
+      // Appliquer la première frame immédiatement
+      if (eyeMeshes.length > 0 && eyeTexturesRef.current.length > 0) {
+        eyeMeshes.forEach((eyeMesh) => {
+          eyeMesh.material.map = eyeTexturesRef.current[0];
+          eyeMesh.material.transparent = true;
+          eyeMesh.material.needsUpdate = true;
+        });
+      }
+
       setModel(model);
     });
 
@@ -319,13 +407,10 @@ const App = () => {
     };
 
     // ─────────────────────────────────────────
-    // DRAG — projection 1:1
+    // DRAG
     // ─────────────────────────────────────────
     let isDragging = false;
-    // Offset entre le point où on a cliqué et le centre du corps physique,
-    // pour que la souris reste exactement où elle était au mousedown
     const dragOffset = new THREE.Vector3();
-    // Point 3D utilisé comme référence pour le plan de projection (fixé au mousedown)
     const dragPlanePoint = new THREE.Vector3();
 
     const getClientPos = (e) => {
@@ -340,15 +425,12 @@ const App = () => {
       if (!isOverModel(clientX, clientY)) return;
 
       isDragging = true;
-
-      // On fixe le point de référence du plan sur la position actuelle du corps
       dragPlanePoint.set(
         characterBody.position.x,
         characterBody.position.y,
         characterBody.position.z,
       );
 
-      // Où est la souris en 3D sur ce plan ?
       const mouseWorld = getMouseOnPlane(
         clientX,
         clientY,
@@ -356,15 +438,12 @@ const App = () => {
         renderer,
         dragPlanePoint,
       );
-
-      // Offset = corps - souris → pour ne pas faire sauter le modèle au mousedown
       dragOffset.set(
         characterBody.position.x - mouseWorld.x,
         characterBody.position.y - mouseWorld.y,
         0,
       );
 
-      // Neutralise la gravité
       characterBody.mass = 0;
       characterBody.updateMassProperties();
       characterBody.velocity.set(0, 0, 0);
@@ -375,7 +454,6 @@ const App = () => {
       if (!isDragging) return;
       const { clientX, clientY } = getClientPos(e);
 
-      // Projette la souris sur le même plan (même point de référence)
       const mouseWorld = getMouseOnPlane(
         clientX,
         clientY,
@@ -383,12 +461,9 @@ const App = () => {
         renderer,
         dragPlanePoint,
       );
-
-      // Position du corps = souris + offset
       characterBody.position.x = mouseWorld.x + dragOffset.x;
       characterBody.position.y = mouseWorld.y + dragOffset.y;
 
-      // Bloque au sol
       const minY = GROUND_Y + 0.5;
       if (characterBody.position.y < minY) characterBody.position.y = minY;
 
@@ -398,8 +473,6 @@ const App = () => {
     const onMouseUp = () => {
       if (!isDragging) return;
       isDragging = false;
-
-      // Remet la masse → gravité reprend
       characterBody.mass = 1;
       characterBody.updateMassProperties();
     };
@@ -408,7 +481,6 @@ const App = () => {
     // DROP DE FICHIER
     // ─────────────────────────────────────────
     const onDragOver = (e) => e.preventDefault();
-
     const onDrop = (e) => {
       e.preventDefault();
       if (!mesh) return;
@@ -441,12 +513,34 @@ const App = () => {
 
       world.step(1 / 60, dt, 3);
 
-      skeletonRef.current?.updateBones();
+      // Mise à jour du mixer (animations squelettiques GLB)
+      mixerRef.current?.update(dt);
 
-      // Apply viewport limits even when not dragging
+      // ── Flipbook yeux — avance d'une frame tous les 1/25s ──
+      const eyeTextures = eyeTexturesRef.current;
+      const eyeMeshes = eyeMeshesRef.current;
+
+      if (eyeTextures.length > 0 && eyeMeshes.length > 0) {
+        eyeTimeAccRef.current += dt;
+
+        if (eyeTimeAccRef.current >= EYE_FRAME_DURATION) {
+          // On soustrait la durée plutôt que de reset à 0
+          // pour conserver le surplus et éviter la dérive temporelle
+          eyeTimeAccRef.current -= EYE_FRAME_DURATION;
+
+          eyeFrameRef.current = (eyeFrameRef.current + 1) % EYE_FRAME_COUNT;
+          const nextTex = eyeTextures[eyeFrameRef.current];
+
+          eyeMeshes.forEach((eyeMesh) => {
+            eyeMesh.material.map = nextTex;
+            eyeMesh.material.needsUpdate = true;
+          });
+        }
+      }
+
+      skeletonRef.current?.updateBones();
       clampByModelEdges();
 
-      // Prevent character from going under the ground
       const minY = GROUND_Y + 0.5;
       if (characterBody.position.y < minY) {
         characterBody.position.y = minY;
@@ -461,6 +555,7 @@ const App = () => {
         );
       }
 
+      updateLightTarget();
       renderer.render(scene, camera);
     };
     animate();
@@ -493,6 +588,10 @@ const App = () => {
     setReady(true);
     return () => {
       cancelAnimationFrame(animId);
+      mixerRef.current?.stopAllAction();
+      mixerRef.current = null;
+      eyeTexturesRef.current.forEach((t) => t.dispose());
+      eyeTexturesRef.current = [];
       window.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
@@ -509,7 +608,7 @@ const App = () => {
   return (
     <main className="relative w-full h-screen">
       <p className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
-        Click on “space” or “esc” to open the menu.
+        Click on "space" or "esc" to open the menu.
       </p>
       <ButtonAddItem
         scene={sceneRef.current}
@@ -517,25 +616,16 @@ const App = () => {
         camera={cameraRef.current}
         renderer={rendererRef.current}
         spawnedItems={spawnedItemsRef}
-        characterBody={characterBodyRef.current} // ← on passe maintenant le ref
+        characterBody={characterBodyRef.current}
         getViewBounds={() => {
           const camera = cameraRef.current;
           const mesh = meshRef.current;
-
-          if (!camera || !mesh) {
-            return { halfW: 5, halfH: 5 };
-          }
-
+          if (!camera || !mesh) return { halfW: 5, halfH: 5 };
           const distance = camera.position.z - mesh.position.z;
           const vFov = THREE.MathUtils.degToRad(camera.fov);
-
           const viewHeight = 2 * Math.tan(vFov / 2) * distance;
           const viewWidth = viewHeight * camera.aspect;
-
-          return {
-            halfW: viewWidth / 2,
-            halfH: viewHeight / 2,
-          };
+          return { halfW: viewWidth / 2, halfH: viewHeight / 2 };
         }}
       />
       {ready && (
