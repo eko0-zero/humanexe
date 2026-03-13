@@ -18,10 +18,8 @@ const MODEL_Y_OFFSET = -0.5;
 // ── Eye flipbook ──
 const EYE_FRAME_COUNT = 247;
 const EYE_FPS = 25;
-const EYE_FRAME_DURATION = 1 / EYE_FPS; // secondes par frame
+const EYE_FRAME_DURATION = 1 / EYE_FPS;
 
-// Génère le chemin : eye_001.png, eye_002.png... (padding 3 chiffres)
-// Si tes fichiers sont eye_1.png, eye_2.png, change padStart(3, "0") en just String(i + 1)
 const getEyeTexturePath = (index) => {
   const padded = String(index + 1).padStart(3, "0");
   return `./3D/textures/eyes/eyes-v1_${padded}.png`;
@@ -91,7 +89,6 @@ function createPlaceholderCube(scene) {
   return cube;
 }
 
-// Retourne { model, animations }
 function loadModel(scene, placeholderCube) {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
@@ -102,11 +99,20 @@ function loadModel(scene, placeholderCube) {
         const model = gltf.scene;
         model.castShadow = true;
 
+        // Collecte les meshes pour identifier l'index 4 (yeux)
+        const allMeshesInModel = [];
+        model.traverse((n) => {
+          if (n.isMesh) allMeshesInModel.push(n);
+        });
+
         model.traverse((node) => {
           if (node.isMesh) {
             node.castShadow = true;
             node.receiveShadow = false;
-            if (node.material) {
+            // Ne pas cloner le material du mesh des yeux (index 4)
+            // il sera remplacé entièrement par un MeshBasicMaterial
+            const isEyeMesh = allMeshesInModel[4] === node;
+            if (!isEyeMesh && node.material) {
               node.material = node.material.clone();
               node.material.shadowSide = THREE.FrontSide;
             }
@@ -124,58 +130,6 @@ function loadModel(scene, placeholderCube) {
       },
     );
   });
-}
-
-// ─────────────────────────────────────────────
-// HELPER — précharge toutes les textures des yeux
-// ─────────────────────────────────────────────
-function preloadEyeTextures() {
-  const loader = new THREE.TextureLoader();
-  const textures = [];
-
-  for (let i = 0; i < EYE_FRAME_COUNT; i++) {
-    const path = getEyeTexturePath(i);
-    const tex = loader.load(path, undefined, undefined, () =>
-      console.warn(`Texture introuvable : ${path}`),
-    );
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.flipY = false; // GLB utilise des UVs non-flippées
-    textures.push(tex);
-  }
-
-  console.log(`${EYE_FRAME_COUNT} textures yeux préchargées à ${EYE_FPS} fps`);
-  return textures;
-}
-
-// ─────────────────────────────────────────────
-// HELPER — trouve les meshes des yeux dans le modèle
-// ─────────────────────────────────────────────
-function findEyeMeshes(model) {
-  const eyeMeshes = [];
-  model.traverse((node) => {
-    if (node.isMesh) {
-      const name = node.name.toLowerCase();
-      if (
-        name.includes("eye") ||
-        name.includes("yeux") ||
-        name.includes("oeil") ||
-        name.includes("iris") ||
-        name.includes("pupil")
-      ) {
-        eyeMeshes.push(node);
-        console.log(`Mesh yeux trouvé : "${node.name}"`);
-      }
-    }
-  });
-
-  if (eyeMeshes.length === 0) {
-    console.warn("Aucun mesh yeux trouvé. Noms de meshes disponibles :");
-    model.traverse((node) => {
-      if (node.isMesh) console.log(" →", node.name);
-    });
-  }
-
-  return eyeMeshes;
 }
 
 // ─────────────────────────────────────────────
@@ -240,11 +194,11 @@ const App = () => {
   const skeletonRef = useRef(null);
   const mixerRef = useRef(null);
 
-  // Eye flipbook
-  const eyeTexturesRef = useRef([]);
-  const eyeMeshesRef = useRef([]);
-  const eyeFrameRef = useRef(0); // index de la frame courante
-  const eyeTimeAccRef = useRef(0); // accumulateur de temps (secondes)
+  // Eye flipbook — on stocke le material directement pour éviter tout problème de ref
+  const eyeTexturesRef = useRef(new Array(EYE_FRAME_COUNT).fill(null));
+  const eyeMaterialRef = useRef(null);
+  const eyeFrameRef = useRef(0);
+  const eyeTimeAccRef = useRef(0);
 
   // Bone refs
   const headBoneRef = useRef(null);
@@ -285,9 +239,6 @@ const App = () => {
     const characterBody = createCharacterBody(GROUND_Y + 2);
     world.addBody(characterBody);
     characterBodyRef.current = characterBody;
-
-    // ── Précharge les textures des yeux ──
-    eyeTexturesRef.current = preloadEyeTextures();
 
     // ── Modèle ──
     const placeholder = createPlaceholderCube(scene);
@@ -336,23 +287,56 @@ const App = () => {
           action.setLoop(THREE.LoopRepeat, Infinity);
           action.play();
         });
-        console.log(
-          `${animations.length} animation(s) lancée(s) :`,
-          animations.map((a) => a.name),
-        );
       }
 
-      // ── Trouver les meshes des yeux ──
-      const eyeMeshes = findEyeMeshes(model);
-      eyeMeshesRef.current = eyeMeshes;
+      // ── Eye mesh : index 4, nouveau MeshBasicMaterial propre ──
+      const allMeshes = [];
+      model.traverse((n) => {
+        if (n.isMesh) allMeshes.push(n);
+      });
+      const eyeMesh = allMeshes[4];
 
-      // Appliquer la première frame immédiatement
-      if (eyeMeshes.length > 0 && eyeTexturesRef.current.length > 0) {
-        eyeMeshes.forEach((eyeMesh) => {
-          eyeMesh.material.map = eyeTexturesRef.current[0];
-          eyeMesh.material.transparent = true;
-          eyeMesh.material.needsUpdate = true;
+      if (eyeMesh) {
+        // Crée un material propre sans héritage du GLB
+        const eyeMat = new THREE.MeshBasicMaterial({
+          transparent: true, // active le canal alpha du PNG
+          alphaTest: 0, // affiche tous les pixels même quasi-transparents
+          depthWrite: false, // évite les artefacts avec les autres meshes
+          side: THREE.DoubleSide,
         });
+        eyeMesh.material = eyeMat;
+        eyeMesh.visible = false; // caché jusqu'à ce que la 1ère texture soit prête
+        eyeMesh.renderOrder = 2;
+        eyeMaterialRef.current = eyeMat;
+
+        // Charge les textures une par une (chaîne de setTimeout)
+        // pour ne jamais bloquer le thread principal
+        const texLoader = new THREE.TextureLoader();
+
+        const loadNext = (i) => {
+          if (i >= EYE_FRAME_COUNT) return;
+          texLoader.load(
+            getEyeTexturePath(i),
+            (tex) => {
+              tex.colorSpace = THREE.SRGBColorSpace;
+              tex.flipY = false;
+              eyeTexturesRef.current[i] = tex;
+
+              // Applique la frame 0 et rend le mesh visible
+              if (i === 0 && eyeMaterialRef.current) {
+                eyeMaterialRef.current.map = tex;
+                eyeMaterialRef.current.needsUpdate = true;
+                eyeMesh.visible = true; // ← apparaît seulement maintenant
+              }
+
+              setTimeout(() => loadNext(i + 1), 0);
+            },
+            undefined,
+            () => setTimeout(() => loadNext(i + 1), 0),
+          );
+        };
+
+        loadNext(0);
       }
 
       setModel(model);
@@ -477,9 +461,6 @@ const App = () => {
       characterBody.updateMassProperties();
     };
 
-    // ─────────────────────────────────────────
-    // DROP DE FICHIER
-    // ─────────────────────────────────────────
     const onDragOver = (e) => e.preventDefault();
     const onDrop = (e) => {
       e.preventDefault();
@@ -512,29 +493,32 @@ const App = () => {
       lastTime = now;
 
       world.step(1 / 60, dt, 3);
-
-      // Mise à jour du mixer (animations squelettiques GLB)
       mixerRef.current?.update(dt);
 
-      // ── Flipbook yeux — avance d'une frame tous les 1/25s ──
-      const eyeTextures = eyeTexturesRef.current;
-      const eyeMeshes = eyeMeshesRef.current;
-
-      if (eyeTextures.length > 0 && eyeMeshes.length > 0) {
+      // ── Flipbook yeux ──
+      const eyeMat = eyeMaterialRef.current;
+      if (eyeMat) {
         eyeTimeAccRef.current += dt;
-
         if (eyeTimeAccRef.current >= EYE_FRAME_DURATION) {
-          // On soustrait la durée plutôt que de reset à 0
-          // pour conserver le surplus et éviter la dérive temporelle
           eyeTimeAccRef.current -= EYE_FRAME_DURATION;
 
-          eyeFrameRef.current = (eyeFrameRef.current + 1) % EYE_FRAME_COUNT;
-          const nextTex = eyeTextures[eyeFrameRef.current];
+          // Avance à la prochaine frame chargée (skip les null)
+          let next = (eyeFrameRef.current + 1) % EYE_FRAME_COUNT;
+          let tries = 0;
+          while (
+            eyeTexturesRef.current[next] === null &&
+            tries < EYE_FRAME_COUNT
+          ) {
+            next = (next + 1) % EYE_FRAME_COUNT;
+            tries++;
+          }
 
-          eyeMeshes.forEach((eyeMesh) => {
-            eyeMesh.material.map = nextTex;
-            eyeMesh.material.needsUpdate = true;
-          });
+          const tex = eyeTexturesRef.current[next];
+          if (tex) {
+            eyeFrameRef.current = next;
+            eyeMat.map = tex;
+            eyeMat.needsUpdate = true;
+          }
         }
       }
 
@@ -590,8 +574,9 @@ const App = () => {
       cancelAnimationFrame(animId);
       mixerRef.current?.stopAllAction();
       mixerRef.current = null;
-      eyeTexturesRef.current.forEach((t) => t.dispose());
-      eyeTexturesRef.current = [];
+      eyeTexturesRef.current.forEach((t) => t?.dispose());
+      eyeTexturesRef.current = new Array(EYE_FRAME_COUNT).fill(null);
+      eyeMaterialRef.current = null;
       window.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
