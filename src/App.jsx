@@ -19,9 +19,9 @@ const MODEL_Y_OFFSET = -0.5;
 // HELPERS — scène Three.js
 // ─────────────────────────────────────────────
 function createCamera(aspect) {
-  const camera = new THREE.PerspectiveCamera(56, aspect);
-  camera.position.set(0, 2, 2.5);
-  camera.rotation.x = -0.5;
+  const camera = new THREE.PerspectiveCamera(30, aspect);
+  camera.position.set(0, 3.1, 4.9);
+  camera.rotation.x = -0.49;
   return camera;
 }
 

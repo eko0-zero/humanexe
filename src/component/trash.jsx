@@ -6,7 +6,7 @@ const TRASH_PATH = "./3D/models/trash.glb";
 const TRASH_Z_POSITION = 0.37;
 const BASE_SCALE = 0.8;
 const HOVER_SCALE = 0.85;
-const GROUND_Y = -1.15;
+const GROUND_Y = -1.19;
 
 export default function Trash({
   scene,
