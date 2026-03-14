@@ -19,6 +19,9 @@ const MODEL_Y_OFFSET = -0.5;
 const EYE_FRAME_COUNT = 247;
 const EYE_FPS = 25;
 const EYE_FRAME_DURATION = 1 / EYE_FPS;
+// Joue uniquement les frames 150 → 246 (index 149 → 245) en boucle
+const EYE_START_FRAME = 149; // index 0-based → frame 150
+const EYE_END_FRAME = 246; // index 0-based → frame 247 (dernière dispo)
 
 // ── Animation subclip ──
 const ANIM_FPS = 25;
@@ -27,7 +30,7 @@ const ANIM_END_FRAME = 300;
 
 const getEyeTexturePath = (index) => {
   const padded = String(index + 1).padStart(3, "0");
-  return `./3D/textures/eyes/eyes-v1_${padded}.png`;
+  return `./3D/textures/eyes/eyes_${padded}.png`;
 };
 
 // ─────────────────────────────────────────────
@@ -199,7 +202,7 @@ const App = () => {
   // Eye flipbook
   const eyeTexturesRef = useRef(new Array(EYE_FRAME_COUNT).fill(null));
   const eyeMaterialRef = useRef(null);
-  const eyeFrameRef = useRef(0);
+  const eyeFrameRef = useRef(EYE_START_FRAME); // démarre à la frame 150
   const eyeTimeAccRef = useRef(0);
 
   // Bone refs
@@ -320,6 +323,7 @@ const App = () => {
 
         const texLoader = new THREE.TextureLoader();
 
+        // On charge toutes les textures mais on n'affiche que 150→246
         const loadNext = (i) => {
           if (i >= EYE_FRAME_COUNT) return;
           texLoader.load(
@@ -329,7 +333,8 @@ const App = () => {
               tex.flipY = false;
               eyeTexturesRef.current[i] = tex;
 
-              if (i === 0 && eyeMaterialRef.current) {
+              // Applique la frame de départ (150) dès qu'elle est prête
+              if (i === EYE_START_FRAME && eyeMaterialRef.current) {
                 eyeMaterialRef.current.map = tex;
                 eyeMaterialRef.current.needsUpdate = true;
                 eyeMesh.visible = true;
@@ -501,20 +506,25 @@ const App = () => {
       world.step(1 / 60, dt, 3);
       mixerRef.current?.update(dt);
 
-      // ── Flipbook yeux ──
+      // ── Flipbook yeux : boucle entre EYE_START_FRAME et EYE_END_FRAME ──
       const eyeMat = eyeMaterialRef.current;
       if (eyeMat) {
         eyeTimeAccRef.current += dt;
         if (eyeTimeAccRef.current >= EYE_FRAME_DURATION) {
           eyeTimeAccRef.current -= EYE_FRAME_DURATION;
 
-          let next = (eyeFrameRef.current + 1) % EYE_FRAME_COUNT;
+          // Avance à la frame suivante dans la plage 149 → 246
+          let next = eyeFrameRef.current + 1;
+          if (next > EYE_END_FRAME) next = EYE_START_FRAME; // boucle
+
+          // Skip les frames pas encore chargées
           let tries = 0;
           while (
             eyeTexturesRef.current[next] === null &&
-            tries < EYE_FRAME_COUNT
+            tries < EYE_END_FRAME - EYE_START_FRAME + 1
           ) {
-            next = (next + 1) % EYE_FRAME_COUNT;
+            next++;
+            if (next > EYE_END_FRAME) next = EYE_START_FRAME;
             tries++;
           }
 
