@@ -20,6 +20,11 @@ const EYE_FRAME_COUNT = 247;
 const EYE_FPS = 25;
 const EYE_FRAME_DURATION = 1 / EYE_FPS;
 
+// ── Animation subclip ──
+const ANIM_FPS = 25;
+const ANIM_START_FRAME = 150;
+const ANIM_END_FRAME = 300;
+
 const getEyeTexturePath = (index) => {
   const padded = String(index + 1).padStart(3, "0");
   return `./3D/textures/eyes/eyes-v1_${padded}.png`;
@@ -99,7 +104,6 @@ function loadModel(scene, placeholderCube) {
         const model = gltf.scene;
         model.castShadow = true;
 
-        // Collecte les meshes pour identifier l'index 4 (yeux)
         const allMeshesInModel = [];
         model.traverse((n) => {
           if (n.isMesh) allMeshesInModel.push(n);
@@ -109,8 +113,6 @@ function loadModel(scene, placeholderCube) {
           if (node.isMesh) {
             node.castShadow = true;
             node.receiveShadow = false;
-            // Ne pas cloner le material du mesh des yeux (index 4)
-            // il sera remplacé entièrement par un MeshBasicMaterial
             const isEyeMesh = allMeshesInModel[4] === node;
             if (!isEyeMesh && node.material) {
               node.material = node.material.clone();
@@ -194,7 +196,7 @@ const App = () => {
   const skeletonRef = useRef(null);
   const mixerRef = useRef(null);
 
-  // Eye flipbook — on stocke le material directement pour éviter tout problème de ref
+  // Eye flipbook
   const eyeTexturesRef = useRef(new Array(EYE_FRAME_COUNT).fill(null));
   const eyeMaterialRef = useRef(null);
   const eyeFrameRef = useRef(0);
@@ -278,18 +280,26 @@ const App = () => {
         rightArmBoneTopRef.current = skeleton.getBoneByName("rightArmTop");
       }
 
-      // ── Animations GLB en boucle ──
+      // ── Animations : subclip frames 150 → 300 en boucle à 25fps ──
       if (animations && animations.length > 0) {
         const mixer = new THREE.AnimationMixer(model);
         mixerRef.current = mixer;
+
         animations.forEach((clip) => {
-          const action = mixer.clipAction(clip);
+          const subClip = THREE.AnimationUtils.subclip(
+            clip,
+            `${clip.name}_sub`,
+            ANIM_START_FRAME,
+            ANIM_END_FRAME,
+            ANIM_FPS,
+          );
+          const action = mixer.clipAction(subClip);
           action.setLoop(THREE.LoopRepeat, Infinity);
           action.play();
         });
       }
 
-      // ── Eye mesh : index 4, nouveau MeshBasicMaterial propre ──
+      // ── Eye mesh : index 4 ──
       const allMeshes = [];
       model.traverse((n) => {
         if (n.isMesh) allMeshes.push(n);
@@ -297,20 +307,17 @@ const App = () => {
       const eyeMesh = allMeshes[4];
 
       if (eyeMesh) {
-        // Crée un material propre sans héritage du GLB
         const eyeMat = new THREE.MeshBasicMaterial({
-          transparent: true, // active le canal alpha du PNG
-          alphaTest: 0, // affiche tous les pixels même quasi-transparents
-          depthWrite: false, // évite les artefacts avec les autres meshes
+          transparent: true,
+          alphaTest: 0,
+          depthWrite: false,
           side: THREE.DoubleSide,
         });
         eyeMesh.material = eyeMat;
-        eyeMesh.visible = false; // caché jusqu'à ce que la 1ère texture soit prête
+        eyeMesh.visible = false;
         eyeMesh.renderOrder = 2;
         eyeMaterialRef.current = eyeMat;
 
-        // Charge les textures une par une (chaîne de setTimeout)
-        // pour ne jamais bloquer le thread principal
         const texLoader = new THREE.TextureLoader();
 
         const loadNext = (i) => {
@@ -322,11 +329,10 @@ const App = () => {
               tex.flipY = false;
               eyeTexturesRef.current[i] = tex;
 
-              // Applique la frame 0 et rend le mesh visible
               if (i === 0 && eyeMaterialRef.current) {
                 eyeMaterialRef.current.map = tex;
                 eyeMaterialRef.current.needsUpdate = true;
-                eyeMesh.visible = true; // ← apparaît seulement maintenant
+                eyeMesh.visible = true;
               }
 
               setTimeout(() => loadNext(i + 1), 0);
@@ -502,7 +508,6 @@ const App = () => {
         if (eyeTimeAccRef.current >= EYE_FRAME_DURATION) {
           eyeTimeAccRef.current -= EYE_FRAME_DURATION;
 
-          // Avance à la prochaine frame chargée (skip les null)
           let next = (eyeFrameRef.current + 1) % EYE_FRAME_COUNT;
           let tries = 0;
           while (
