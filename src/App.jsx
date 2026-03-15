@@ -6,6 +6,7 @@ import "./index.css";
 import Trash from "./component/trash.jsx";
 import ButtonAddItem from "./component/ButtonAddItems.jsx";
 import Skeleton from "./component/Skeleton.jsx";
+import Interaction from "./component/Interaction.jsx";
 
 // ─────────────────────────────────────────────
 // CONSTANTES
@@ -19,9 +20,8 @@ const MODEL_Y_OFFSET = -0.5;
 const EYE_FRAME_COUNT = 247;
 const EYE_FPS = 25;
 const EYE_FRAME_DURATION = 1 / EYE_FPS;
-// Joue uniquement les frames 150 → 246 (index 149 → 245) en boucle
-const EYE_START_FRAME = 149; // index 0-based → frame 150
-const EYE_END_FRAME = 246; // index 0-based → frame 247 (dernière dispo)
+const EYE_START_FRAME = 149;
+const EYE_END_FRAME = 246;
 
 // ── Animation subclip ──
 const ANIM_FPS = 25;
@@ -198,11 +198,12 @@ const App = () => {
   const spawnedItemsRef = useRef([]);
   const skeletonRef = useRef(null);
   const mixerRef = useRef(null);
+  const rawClipsRef = useRef([]); // ← clips originaux du GLB
 
   // Eye flipbook
   const eyeTexturesRef = useRef(new Array(EYE_FRAME_COUNT).fill(null));
   const eyeMaterialRef = useRef(null);
-  const eyeFrameRef = useRef(EYE_START_FRAME); // démarre à la frame 150
+  const eyeFrameRef = useRef(EYE_START_FRAME);
   const eyeTimeAccRef = useRef(0);
 
   // Bone refs
@@ -260,6 +261,9 @@ const App = () => {
       mesh = model;
       meshRef.current = mesh;
 
+      // ← Stocke les clips originaux AVANT de créer les subclips
+      rawClipsRef.current = animations;
+
       const box = new THREE.Box3().setFromObject(mesh);
       box.getSize(modelSize);
 
@@ -283,7 +287,7 @@ const App = () => {
         rightArmBoneTopRef.current = skeleton.getBoneByName("rightArmTop");
       }
 
-      // ── Animations : subclip frames 150 → 300 en boucle à 25fps ──
+      // ── Animations : boucle 150→300 par défaut ──
       if (animations && animations.length > 0) {
         const mixer = new THREE.AnimationMixer(model);
         mixerRef.current = mixer;
@@ -323,7 +327,6 @@ const App = () => {
 
         const texLoader = new THREE.TextureLoader();
 
-        // On charge toutes les textures mais on n'affiche que 150→246
         const loadNext = (i) => {
           if (i >= EYE_FRAME_COUNT) return;
           texLoader.load(
@@ -333,7 +336,6 @@ const App = () => {
               tex.flipY = false;
               eyeTexturesRef.current[i] = tex;
 
-              // Applique la frame de départ (150) dès qu'elle est prête
               if (i === EYE_START_FRAME && eyeMaterialRef.current) {
                 eyeMaterialRef.current.map = tex;
                 eyeMaterialRef.current.needsUpdate = true;
@@ -513,11 +515,9 @@ const App = () => {
         if (eyeTimeAccRef.current >= EYE_FRAME_DURATION) {
           eyeTimeAccRef.current -= EYE_FRAME_DURATION;
 
-          // Avance à la frame suivante dans la plage 149 → 246
           let next = eyeFrameRef.current + 1;
-          if (next > EYE_END_FRAME) next = EYE_START_FRAME; // boucle
+          if (next > EYE_END_FRAME) next = EYE_START_FRAME;
 
-          // Skip les frames pas encore chargées
           let tries = 0;
           while (
             eyeTexturesRef.current[next] === null &&
@@ -648,6 +648,14 @@ const App = () => {
           rightArmBone={rightArmBoneRef.current}
           leftArmBoneTop={leftArmBoneTopRef.current}
           rightArmBoneTop={rightArmBoneTopRef.current}
+        />
+      )}
+      {model && (
+        <Interaction
+          mixerRef={mixerRef}
+          rawClips={rawClipsRef.current}
+          spawnedItems={spawnedItemsRef}
+          characterBody={characterBodyRef}
         />
       )}
       <canvas ref={canvasRef}></canvas>
