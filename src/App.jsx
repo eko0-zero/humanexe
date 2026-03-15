@@ -102,16 +102,21 @@ function loadModel(scene, placeholderCube) {
         const model = gltf.scene;
         model.castShadow = true;
 
+        // ── Détection du eye mesh par nom plutôt que par index ──
         const allMeshesInModel = [];
         model.traverse((n) => {
           if (n.isMesh) allMeshesInModel.push(n);
         });
 
+        const eyeMesh =
+          allMeshesInModel.find((m) => m.name.toLowerCase().includes("eye")) ??
+          null;
+
         model.traverse((node) => {
           if (node.isMesh) {
             node.castShadow = true;
             node.receiveShadow = false;
-            const isEyeMesh = allMeshesInModel[4] === node;
+            const isEyeMesh = eyeMesh !== null && eyeMesh === node;
             if (!isEyeMesh && node.material) {
               node.material = node.material.clone();
               node.material.shadowSide = THREE.FrontSide;
@@ -121,7 +126,7 @@ function loadModel(scene, placeholderCube) {
 
         model.scale.set(1.4, 1.4, 1.4);
         scene.add(model);
-        resolve({ model, animations: gltf.animations });
+        resolve({ model, animations: gltf.animations, eyeMesh });
       },
       undefined,
       (error) => {
@@ -162,7 +167,7 @@ function createCharacterBody(startY) {
 // ─────────────────────────────────────────────
 // HELPER — projection souris → point 3D
 // ─────────────────────────────────────────────
-function getMouseOnPlane(clientX, clientY, camera, renderer, planePoint) {
+function getMouseOnPlane(clientX, clientY, camera, renderer, planeOrigin) {
   const rect = renderer.domElement.getBoundingClientRect();
   const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
   const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -170,10 +175,11 @@ function getMouseOnPlane(clientX, clientY, camera, renderer, planePoint) {
   const ray = new THREE.Raycaster();
   ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
 
+  // Plan perpendiculaire a la direction camera, centre sur le personnage
   const normal = new THREE.Vector3();
   camera.getWorldDirection(normal);
-  const plane = new THREE.Plane();
-  plane.setFromNormalAndCoplanarPoint(normal, planePoint);
+  const origin = planeOrigin ?? new THREE.Vector3(0, 0, 0);
+  const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, origin);
 
   const target = new THREE.Vector3();
   ray.ray.intersectPlane(plane, target);
@@ -204,15 +210,22 @@ const App = () => {
   const meshRef = useRef(null);
   const characterBodyRef = useRef(null);
 
+  // ── Refs drag exposés à la boucle animate ──
+  const isDraggingRef = useRef(false);
+  const mouseWorldRef = useRef(new THREE.Vector3());
+
   const [ready, setReady] = useState(false);
   const [model, setModel] = useState(null);
 
   useEffect(() => {
+    console.log("useEffect INIT — canvas:", canvasRef.current);
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const width = window.innerWidth;
     const height = window.innerHeight;
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
@@ -234,7 +247,7 @@ const App = () => {
 
     const placeholder = createPlaceholderCube(scene);
     let mesh = placeholder;
-    let modelSize = new THREE.Vector3(1, 1, 1);
+    const modelSizeRef = { current: new THREE.Vector3(1, 1, 1) };
 
     mesh.position.set(
       characterBody.position.x,
@@ -242,13 +255,32 @@ const App = () => {
       characterBody.position.z,
     );
 
-    loadModel(scene, placeholder).then(({ model, animations }) => {
+    loadModel(scene, placeholder).then(({ model, animations, eyeMesh }) => {
+      // ── DEBUG ──
+      const allMeshesDebug = [];
+      model.traverse((n) => {
+        if (n.isMesh) allMeshesDebug.push(n);
+      });
+      console.log(
+        "MESHES:",
+        allMeshesDebug.map((m, i) => `[${i}] ${m.name}`),
+      );
+      model.traverse((o) => {
+        if (o.isSkinnedMesh && o.skeleton) {
+          console.log(
+            "SKELETON bones:",
+            o.skeleton.bones.map((b) => b.name),
+          );
+        }
+      });
+      // ── FIN DEBUG ──
+
       mesh = model;
       meshRef.current = mesh;
       rawClipsRef.current = animations;
 
       const box = new THREE.Box3().setFromObject(mesh);
-      box.getSize(modelSize);
+      box.getSize(modelSizeRef.current);
 
       mesh.position.set(
         characterBody.position.x,
@@ -256,19 +288,13 @@ const App = () => {
         characterBody.position.z,
       );
 
-      // ── Mixer (Interaction gère les actions) ──
+      // ── Mixer ──
       if (animations && animations.length > 0) {
         const mixer = new THREE.AnimationMixer(model);
         mixerRef.current = mixer;
       }
 
-      // ── Eye mesh : index 4 ──
-      const allMeshes = [];
-      model.traverse((n) => {
-        if (n.isMesh) allMeshes.push(n);
-      });
-      const eyeMesh = allMeshes[4];
-
+      // ── Eye mesh : détecté par nom dans loadModel ──
       if (eyeMesh) {
         const eyeMat = new THREE.MeshBasicMaterial({
           transparent: true,
@@ -302,6 +328,10 @@ const App = () => {
           );
         };
         loadNext(0);
+      } else {
+        console.log(
+          "[App] Pas de eye mesh trouvé dans ce GLB — flipbook désactivé.",
+        );
       }
 
       setModel(model);
@@ -319,25 +349,31 @@ const App = () => {
     };
 
     const isOverModel = (clientX, clientY) => {
-      if (!mesh) return false;
+      const m = meshRef.current;
+      if (!m) return false;
       screenToNDC(clientX, clientY);
       raycaster.setFromCamera(mouse, camera);
-      return raycaster.intersectObjects([mesh], true).length > 0;
+      // Collecte tous les sous-meshes pour eviter les zones mortes
+      const children = [];
+      m.traverse((n) => {
+        if (n.isMesh) children.push(n);
+      });
+      return raycaster.intersectObjects(children, false).length > 0;
     };
 
     const getViewBounds = () => {
-      const distance = camera.position.z - mesh.position.z;
+      const distance = camera.position.z - (meshRef.current?.position.z ?? 0);
       const vFov = THREE.MathUtils.degToRad(camera.fov);
       const viewHeight = 2 * Math.tan(vFov / 2) * distance;
       const viewWidth = viewHeight * camera.aspect;
       return { halfW: viewWidth / 1.5, halfH: viewHeight / 1.5 };
     };
 
-    const clampByModelEdges = () => {
-      if (!mesh) return;
+    const clampByModelEdges = (clampY = true) => {
+      if (!meshRef.current) return;
       const { halfW, halfH } = getViewBounds();
-      const halfModelW = modelSize.x / 2;
-      const modelHeight = modelSize.y;
+      const halfModelW = modelSizeRef.current.x / 2;
+      const modelHeight = modelSizeRef.current.y;
 
       characterBody.position.x = THREE.MathUtils.clamp(
         characterBody.position.x,
@@ -345,13 +381,13 @@ const App = () => {
         halfW - halfModelW,
       );
 
-      const maxY = halfH - modelHeight / 2;
-      if (characterBody.position.y > maxY) characterBody.position.y = maxY;
+      if (clampY) {
+        const maxY = halfH - modelHeight / 2;
+        if (characterBody.position.y > maxY) characterBody.position.y = maxY;
+      }
     };
 
-    let isDragging = false;
     const dragOffset = new THREE.Vector3();
-    const dragPlanePoint = new THREE.Vector3();
 
     const getClientPos = (e) => {
       if (e.touches && e.touches.length > 0)
@@ -361,27 +397,50 @@ const App = () => {
 
     const onMouseDown = (e) => {
       const { clientX, clientY } = getClientPos(e);
-      if (!isOverModel(clientX, clientY)) return;
 
-      isDragging = true;
-      dragPlanePoint.set(
+      // DEBUG
+      screenToNDC(clientX, clientY);
+      raycaster.setFromCamera(mouse, camera);
+      const dbgChildren = [];
+      if (meshRef.current)
+        meshRef.current.traverse((n) => {
+          if (n.isMesh) dbgChildren.push(n);
+        });
+      const dbgHits = raycaster.intersectObjects(dbgChildren, false);
+      console.log("CLICK children count:", dbgChildren.length);
+      console.log(
+        "CLICK hits:",
+        dbgHits.length,
+        dbgHits.map((h) => h.object.name),
+      );
+      console.log("CLICK isOverModel:", isOverModel(clientX, clientY));
+      // FIN DEBUG
+
+      if (!isOverModel(clientX, clientY)) return;
+      console.log("PASSED isOverModel — drag start");
+
+      isDraggingRef.current = true;
+
+      const planeOrigin = new THREE.Vector3(
         characterBody.position.x,
         characterBody.position.y,
         characterBody.position.z,
       );
-
       const mouseWorld = getMouseOnPlane(
         clientX,
         clientY,
         camera,
         renderer,
-        dragPlanePoint,
+        planeOrigin,
       );
-      dragOffset.set(
-        characterBody.position.x - mouseWorld.x,
-        characterBody.position.y - mouseWorld.y,
-        0,
-      );
+      if (mouseWorld) {
+        mouseWorldRef.current.copy(mouseWorld);
+        dragOffset.set(
+          characterBody.position.x - mouseWorld.x,
+          characterBody.position.y - mouseWorld.y,
+          0,
+        );
+      }
 
       characterBody.mass = 0;
       characterBody.updateMassProperties();
@@ -390,27 +449,45 @@ const App = () => {
     };
 
     const onMouseMove = (e) => {
-      if (!isDragging) return;
+      if (!isDraggingRef.current) return;
       const { clientX, clientY } = getClientPos(e);
 
+      const planeOrigin = new THREE.Vector3(
+        characterBody.position.x,
+        characterBody.position.y,
+        characterBody.position.z,
+      );
       const mouseWorld = getMouseOnPlane(
         clientX,
         clientY,
         camera,
         renderer,
-        dragPlanePoint,
+        planeOrigin,
       );
+      if (!mouseWorld) return;
+
+      console.log(
+        "mouseWorld.y:",
+        mouseWorld.y.toFixed(3),
+        "dragOffset.y:",
+        dragOffset.y.toFixed(3),
+        "=> body.y:",
+        (mouseWorld.y + dragOffset.y).toFixed(3),
+      );
+
+      mouseWorldRef.current.copy(mouseWorld);
+
       characterBody.position.x = mouseWorld.x + dragOffset.x;
       characterBody.position.y = mouseWorld.y + dragOffset.y;
 
       const minY = GROUND_Y + 0.5;
       if (characterBody.position.y < minY) characterBody.position.y = minY;
-      clampByModelEdges();
+      clampByModelEdges(false); // pas de clamp Y pendant le drag
     };
 
     const onMouseUp = () => {
-      if (!isDragging) return;
-      isDragging = false;
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
       characterBody.mass = 1;
       characterBody.updateMassProperties();
     };
@@ -425,8 +502,9 @@ const App = () => {
     };
 
     const updateLightTarget = () => {
-      if (!mesh) return;
-      dirLight.target.position.copy(mesh.position);
+      const m = meshRef.current;
+      if (!m) return;
+      dirLight.target.position.copy(m.position);
       dirLight.target.updateMatrixWorld();
     };
 
@@ -472,8 +550,11 @@ const App = () => {
         }
       }
 
-      // Skeleton gère son propre état frozen en interne
-      skeletonRef.current?.updateBones();
+      // ── updateBones avec isDragging + mouseWorld ──
+      skeletonRef.current?.updateBones(
+        isDraggingRef.current,
+        mouseWorldRef.current,
+      );
 
       clampByModelEdges();
 
@@ -483,11 +564,22 @@ const App = () => {
         characterBody.velocity.y = 0;
       }
 
-      if (mesh) {
-        mesh.position.set(
+      const activeMesh = meshRef.current;
+      if (activeMesh) {
+        activeMesh.position.set(
           characterBody.position.x,
           characterBody.position.y + MODEL_Y_OFFSET,
           characterBody.position.z,
+        );
+      }
+
+      // DEBUG position
+      if (meshRef.current) {
+        console.log(
+          "mesh.y:",
+          meshRef.current.position.y.toFixed(3),
+          "| body.y:",
+          characterBody.position.y.toFixed(3),
         );
       }
 
@@ -497,9 +589,13 @@ const App = () => {
     animate();
 
     const onResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(w, h);
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
     };
 
     window.addEventListener("mousedown", onMouseDown);
@@ -583,7 +679,10 @@ const App = () => {
           skeletonRef={skeletonRef}
         />
       )}
-      <canvas ref={canvasRef}></canvas>
+      <canvas
+        ref={canvasRef}
+        style={{ display: "block", position: "absolute", top: 0, left: 0 }}
+      ></canvas>
     </main>
   );
 };
