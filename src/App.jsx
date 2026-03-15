@@ -23,11 +23,6 @@ const EYE_FRAME_DURATION = 1 / EYE_FPS;
 const EYE_START_FRAME = 149;
 const EYE_END_FRAME = 246;
 
-// ── Animation subclip ──
-const ANIM_FPS = 25;
-const ANIM_START_FRAME = 150;
-const ANIM_END_FRAME = 300;
-
 const getEyeTexturePath = (index) => {
   const padded = String(index + 1).padStart(3, "0");
   return `./3D/textures/eyes/eyes_${padded}.png`;
@@ -182,7 +177,6 @@ function getMouseOnPlane(clientX, clientY, camera, renderer, planePoint) {
 
   const target = new THREE.Vector3();
   ray.ray.intersectPlane(plane, target);
-
   return target;
 }
 
@@ -198,20 +192,14 @@ const App = () => {
   const spawnedItemsRef = useRef([]);
   const skeletonRef = useRef(null);
   const mixerRef = useRef(null);
-  const rawClipsRef = useRef([]); // ← clips originaux du GLB
+  const rawClipsRef = useRef([]);
+  const isIntroRef = useRef(false);
 
   // Eye flipbook
   const eyeTexturesRef = useRef(new Array(EYE_FRAME_COUNT).fill(null));
   const eyeMaterialRef = useRef(null);
   const eyeFrameRef = useRef(EYE_START_FRAME);
   const eyeTimeAccRef = useRef(0);
-
-  // Bone refs
-  const headBoneRef = useRef(null);
-  const leftArmBoneRef = useRef(null);
-  const rightArmBoneRef = useRef(null);
-  const leftArmBoneTopRef = useRef(null);
-  const rightArmBoneTopRef = useRef(null);
 
   const meshRef = useRef(null);
   const characterBodyRef = useRef(null);
@@ -226,7 +214,6 @@ const App = () => {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    // ── Scène ──
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     const camera = createCamera(width / height);
@@ -236,7 +223,6 @@ const App = () => {
     const { dirLight } = createLights(scene);
     createGround(scene);
 
-    // ── Physique ──
     const world = createPhysicsWorld();
     worldRef.current = world;
     const groundBody = createGroundBody();
@@ -246,7 +232,6 @@ const App = () => {
     world.addBody(characterBody);
     characterBodyRef.current = characterBody;
 
-    // ── Modèle ──
     const placeholder = createPlaceholderCube(scene);
     let mesh = placeholder;
     let modelSize = new THREE.Vector3(1, 1, 1);
@@ -260,8 +245,6 @@ const App = () => {
     loadModel(scene, placeholder).then(({ model, animations }) => {
       mesh = model;
       meshRef.current = mesh;
-
-      // ← Stocke les clips originaux AVANT de créer les subclips
       rawClipsRef.current = animations;
 
       const box = new THREE.Box3().setFromObject(mesh);
@@ -273,37 +256,10 @@ const App = () => {
         characterBody.position.z,
       );
 
-      // ── Bones ──
-      const skeleton = model.getObjectByProperty(
-        "type",
-        "SkinnedMesh",
-      )?.skeleton;
-      if (skeleton) {
-        headBoneRef.current =
-          skeleton.getBoneByName("head") || skeleton.getBoneByName("Head");
-        leftArmBoneRef.current = skeleton.getBoneByName("leftArm");
-        rightArmBoneRef.current = skeleton.getBoneByName("rightArm");
-        leftArmBoneTopRef.current = skeleton.getBoneByName("leftArmTop");
-        rightArmBoneTopRef.current = skeleton.getBoneByName("rightArmTop");
-      }
-
-      // ── Animations : boucle 150→300 par défaut ──
+      // ── Mixer (Interaction gère les actions) ──
       if (animations && animations.length > 0) {
         const mixer = new THREE.AnimationMixer(model);
         mixerRef.current = mixer;
-
-        animations.forEach((clip) => {
-          const subClip = THREE.AnimationUtils.subclip(
-            clip,
-            `${clip.name}_sub`,
-            ANIM_START_FRAME,
-            ANIM_END_FRAME,
-            ANIM_FPS,
-          );
-          const action = mixer.clipAction(subClip);
-          action.setLoop(THREE.LoopRepeat, Infinity);
-          action.play();
-        });
       }
 
       // ── Eye mesh : index 4 ──
@@ -326,7 +282,6 @@ const App = () => {
         eyeMaterialRef.current = eyeMat;
 
         const texLoader = new THREE.TextureLoader();
-
         const loadNext = (i) => {
           if (i >= EYE_FRAME_COUNT) return;
           texLoader.load(
@@ -335,20 +290,17 @@ const App = () => {
               tex.colorSpace = THREE.SRGBColorSpace;
               tex.flipY = false;
               eyeTexturesRef.current[i] = tex;
-
               if (i === EYE_START_FRAME && eyeMaterialRef.current) {
                 eyeMaterialRef.current.map = tex;
                 eyeMaterialRef.current.needsUpdate = true;
                 eyeMesh.visible = true;
               }
-
               setTimeout(() => loadNext(i + 1), 0);
             },
             undefined,
             () => setTimeout(() => loadNext(i + 1), 0),
           );
         };
-
         loadNext(0);
       }
 
@@ -357,9 +309,6 @@ const App = () => {
 
     renderer.render(scene, camera);
 
-    // ─────────────────────────────────────────
-    // RAYCASTER
-    // ─────────────────────────────────────────
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -376,9 +325,6 @@ const App = () => {
       return raycaster.intersectObjects([mesh], true).length > 0;
     };
 
-    // ─────────────────────────────────────────
-    // CLAMP — bords de l'écran
-    // ─────────────────────────────────────────
     const getViewBounds = () => {
       const distance = camera.position.z - mesh.position.z;
       const vFov = THREE.MathUtils.degToRad(camera.fov);
@@ -403,17 +349,13 @@ const App = () => {
       if (characterBody.position.y > maxY) characterBody.position.y = maxY;
     };
 
-    // ─────────────────────────────────────────
-    // DRAG
-    // ─────────────────────────────────────────
     let isDragging = false;
     const dragOffset = new THREE.Vector3();
     const dragPlanePoint = new THREE.Vector3();
 
     const getClientPos = (e) => {
-      if (e.touches && e.touches.length > 0) {
+      if (e.touches && e.touches.length > 0)
         return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
-      }
       return { clientX: e.clientX, clientY: e.clientY };
     };
 
@@ -463,7 +405,6 @@ const App = () => {
 
       const minY = GROUND_Y + 0.5;
       if (characterBody.position.y < minY) characterBody.position.y = minY;
-
       clampByModelEdges();
     };
 
@@ -483,18 +424,12 @@ const App = () => {
       raycaster.intersectObjects([mesh], true);
     };
 
-    // ─────────────────────────────────────────
-    // LUMIÈRE suit le modèle
-    // ─────────────────────────────────────────
     const updateLightTarget = () => {
       if (!mesh) return;
       dirLight.target.position.copy(mesh.position);
       dirLight.target.updateMatrixWorld();
     };
 
-    // ─────────────────────────────────────────
-    // BOUCLE D'ANIMATION
-    // ─────────────────────────────────────────
     let animId;
     let lastTime = performance.now();
 
@@ -508,7 +443,7 @@ const App = () => {
       world.step(1 / 60, dt, 3);
       mixerRef.current?.update(dt);
 
-      // ── Flipbook yeux : boucle entre EYE_START_FRAME et EYE_END_FRAME ──
+      // Eye flipbook
       const eyeMat = eyeMaterialRef.current;
       if (eyeMat) {
         eyeTimeAccRef.current += dt;
@@ -537,7 +472,9 @@ const App = () => {
         }
       }
 
+      // Skeleton gère son propre état frozen en interne
       skeletonRef.current?.updateBones();
+
       clampByModelEdges();
 
       const minY = GROUND_Y + 0.5;
@@ -559,18 +496,12 @@ const App = () => {
     };
     animate();
 
-    // ─────────────────────────────────────────
-    // RESIZE
-    // ─────────────────────────────────────────
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
 
-    // ─────────────────────────────────────────
-    // EVENTS
-    // ─────────────────────────────────────────
     window.addEventListener("mousedown", onMouseDown);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
@@ -581,9 +512,6 @@ const App = () => {
     renderer.domElement.addEventListener("dragover", onDragOver);
     renderer.domElement.addEventListener("drop", onDrop);
 
-    // ─────────────────────────────────────────
-    // CLEANUP
-    // ─────────────────────────────────────────
     setReady(true);
     return () => {
       cancelAnimationFrame(animId);
@@ -643,11 +571,6 @@ const App = () => {
           model={model}
           world={worldRef.current}
           characterBody={characterBodyRef.current}
-          headBone={headBoneRef.current}
-          leftArmBone={leftArmBoneRef.current}
-          rightArmBone={rightArmBoneRef.current}
-          leftArmBoneTop={leftArmBoneTopRef.current}
-          rightArmBoneTop={rightArmBoneTopRef.current}
         />
       )}
       {model && (
@@ -656,6 +579,8 @@ const App = () => {
           rawClips={rawClipsRef.current}
           spawnedItems={spawnedItemsRef}
           characterBody={characterBodyRef}
+          isIntroRef={isIntroRef}
+          skeletonRef={skeletonRef}
         />
       )}
       <canvas ref={canvasRef}></canvas>

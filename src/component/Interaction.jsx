@@ -1,151 +1,140 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-// ─────────────────────────────────────────────
-// CONSTANTES
-// ─────────────────────────────────────────────
 const ANIM_FPS = 25;
 const COLLISION_DISTANCE = 1.2;
+
+const START_TIME = 0;
+const MID_TIME = 150 / ANIM_FPS; // 6.0s
+const END_TIME = 300 / ANIM_FPS; // 12.0s
 
 const PHASE_LOOP = "loop";
 const PHASE_INTRO = "intro";
 
-// ─────────────────────────────────────────────
-// COMPOSANT
-// Props depuis App.jsx :
-//   mixerRef      — ref vers THREE.AnimationMixer du character
-//   rawClips      — tableau des clips GLB originaux (gltf.animations)
-//   spawnedItems  — ref vers le tableau { mesh, body }[] des items
-//   characterBody — ref vers le Body cannon-es du character
-// ─────────────────────────────────────────────
-const Interaction = ({ mixerRef, rawClips, spawnedItems, characterBody }) => {
+const Interaction = ({
+  mixerRef,
+  rawClips,
+  spawnedItems,
+  characterBody,
+  isIntroRef,
+  skeletonRef,
+}) => {
   const phaseRef = useRef(PHASE_LOOP);
-  const introActionsRef = useRef(null);
-  const loopActionsRef = useRef(null);
+  const actionsRef = useRef(null);
   const initializedRef = useRef(false);
+  const rafInitRef = useRef(null);
+  const rafCheckRef = useRef(null);
 
-  // ── Initialise les actions dès que mixer + rawClips sont dispos ──
+  // ── Init : crée les actions et capture la rest pose à frame 150 ──
   useEffect(() => {
-    let rafId;
-
     const tryInit = () => {
       const mixer = mixerRef?.current;
       if (!mixer || !rawClips || rawClips.length === 0) {
-        rafId = requestAnimationFrame(tryInit);
+        rafInitRef.current = requestAnimationFrame(tryInit);
         return;
       }
 
-      // Actions boucle (150→300) — celles déjà actives lancées par App.jsx
-      const currentActions = [...mixer._actions];
-      loopActionsRef.current = currentActions;
+      mixer.stopAllAction();
 
-      // Actions intro (0→150) — créées depuis les clips ORIGINAUX du GLB
-      const introActions = rawClips.map((clip) => {
-        const introClip = THREE.AnimationUtils.subclip(
-          clip,
-          `${clip.name}_intro`,
-          0,
-          150,
-          ANIM_FPS,
-        );
-        const action = mixer.clipAction(introClip);
-        action.setLoop(THREE.LoopOnce, 1);
-        action.clampWhenFinished = true;
+      const actions = rawClips.map((clip) => {
+        const action = mixer.clipAction(clip);
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.time = MID_TIME;
+        action.play();
         return action;
       });
 
-      introActionsRef.current = introActions;
-      initializedRef.current = true;
+      actionsRef.current = actions;
+
+      // Laisse 3 frames au mixer pour appliquer la pose à frame 150
+      // puis capture les quaternions au repos pour Skeleton
+      let waitFrames = 0;
+      const waitAndCapture = () => {
+        waitFrames++;
+        if (waitFrames < 4) {
+          requestAnimationFrame(waitAndCapture);
+          return;
+        }
+        // Force l'évaluation à MID_TIME
+        mixer.setTime(MID_TIME);
+
+        // Capture la rest pose sur Skeleton maintenant que les bones sont à frame 150
+        skeletonRef?.current?.captureRestPose();
+
+        initializedRef.current = true;
+        phaseRef.current = PHASE_LOOP;
+        if (isIntroRef) isIntroRef.current = false;
+      };
+      requestAnimationFrame(waitAndCapture);
     };
 
-    rafId = requestAnimationFrame(tryInit);
-    return () => cancelAnimationFrame(rafId);
-  }, [mixerRef, rawClips]);
+    rafInitRef.current = requestAnimationFrame(tryInit);
+    return () => cancelAnimationFrame(rafInitRef.current);
+  }, [mixerRef, rawClips, skeletonRef]);
 
-  // ── Fin de l'intro → bascule sur la boucle 150→300 ──
+  // ── Boucle : contrôle bornes + collision ──
   useEffect(() => {
-    let mixer = mixerRef?.current;
-
-    const onFinished = (e) => {
-      if (phaseRef.current !== PHASE_INTRO) return;
-
-      const introActions = introActionsRef.current;
-      const loopActions = loopActionsRef.current;
-      if (!introActions || !loopActions) return;
-
-      if (!introActions.some((a) => a === e.action)) return;
-
-      introActions.forEach((a) => a.stop());
-      loopActions.forEach((a) => {
-        a.reset();
-        a.play();
-      });
-      phaseRef.current = PHASE_LOOP;
-    };
-
-    // Le mixer peut ne pas être disponible immédiatement
-    const attach = () => {
-      mixer = mixerRef?.current;
-      if (!mixer) {
-        setTimeout(attach, 100);
-        return;
-      }
-      mixer.addEventListener("finished", onFinished);
-    };
-    attach();
-
-    return () => mixer?.removeEventListener("finished", onFinished);
-  }, [mixerRef]);
-
-  // ── Détection de collision ──
-  useEffect(() => {
-    let frameId;
-
     const check = () => {
-      frameId = requestAnimationFrame(check);
-
-      if (phaseRef.current === PHASE_INTRO) return;
+      rafCheckRef.current = requestAnimationFrame(check);
       if (!initializedRef.current) return;
 
-      const items = spawnedItems?.current;
-      const charBody = characterBody?.current;
-      if (!items || items.length === 0 || !charBody) return;
+      const actions = actionsRef.current;
+      if (!actions) return;
 
-      const cx = charBody.position.x;
-      const cy = charBody.position.y;
-      const cz = charBody.position.z;
+      if (phaseRef.current === PHASE_LOOP) {
+        // Maintient dans [MID_TIME, END_TIME]
+        actions.forEach((a) => {
+          if (a.time >= END_TIME || a.time < MID_TIME) {
+            a.time = MID_TIME;
+          }
+        });
 
-      for (const item of items) {
-        if (!item?.body) continue;
-        const dx = cx - item.body.position.x;
-        const dy = cy - item.body.position.y;
-        const dz = cz - item.body.position.z;
+        // Détection de collision
+        const items = spawnedItems?.current;
+        const charBody = characterBody?.current;
+        if (items && items.length > 0 && charBody) {
+          const cx = charBody.position.x;
+          const cy = charBody.position.y;
+          const cz = charBody.position.z;
 
-        if (Math.sqrt(dx * dx + dy * dy + dz * dz) < COLLISION_DISTANCE) {
-          triggerIntro();
-          break;
+          for (const item of items) {
+            if (!item?.body) continue;
+            const dx = cx - item.body.position.x;
+            const dy = cy - item.body.position.y;
+            const dz = cz - item.body.position.z;
+
+            if (Math.sqrt(dx * dx + dy * dy + dz * dz) < COLLISION_DISTANCE) {
+              phaseRef.current = PHASE_INTRO;
+              if (isIntroRef) isIntroRef.current = true;
+              skeletonRef?.current?.freezeSprings();
+              actions.forEach((a) => {
+                a.time = START_TIME;
+              });
+              break;
+            }
+          }
+        }
+      } else if (phaseRef.current === PHASE_INTRO) {
+        const done = actions.every((a) => a.time >= MID_TIME);
+        if (done) {
+          actions.forEach((a) => {
+            a.time = MID_TIME;
+          });
+          phaseRef.current = PHASE_LOOP;
+
+          // Recapture la rest pose au retour à frame 150
+          requestAnimationFrame(() => {
+            skeletonRef?.current?.captureRestPose();
+            skeletonRef?.current?.unfreezeSprings();
+            if (isIntroRef) isIntroRef.current = false;
+          });
         }
       }
     };
 
-    frameId = requestAnimationFrame(check);
-    return () => cancelAnimationFrame(frameId);
-  }, [spawnedItems, characterBody]);
-
-  const triggerIntro = () => {
-    if (phaseRef.current === PHASE_INTRO) return;
-
-    const introActions = introActionsRef.current;
-    const loopActions = loopActionsRef.current;
-    if (!introActions || !loopActions) return;
-
-    phaseRef.current = PHASE_INTRO;
-    loopActions.forEach((a) => a.stop());
-    introActions.forEach((a) => {
-      a.reset();
-      a.play();
-    });
-  };
+    rafCheckRef.current = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(rafCheckRef.current);
+  }, [spawnedItems, characterBody, isIntroRef, skeletonRef]);
 
   return null;
 };
