@@ -34,6 +34,7 @@ const Interaction = ({
   const currentAnimRef = useRef(null);
   const actionsRef = useRef([]);
 
+  // ── Init ──
   useEffect(() => {
     const tryInit = () => {
       const mixer = mixerRef?.current;
@@ -83,6 +84,7 @@ const Interaction = ({
     return () => cancelAnimationFrame(rafInitRef.current);
   }, [mixerRef, rawClips, skeletonRef]);
 
+  // ── Boucle de contrôle ──
   useEffect(() => {
     const check = () => {
       rafCheckRef.current = requestAnimationFrame(check);
@@ -115,7 +117,8 @@ const Interaction = ({
         if (!items?.length || !charBody) return;
 
         for (const item of items) {
-          if (!item?.body) continue;
+          if (!item?.body || item.consumed) continue;
+
           const dx = charBody.position.x - item.body.position.x;
           const dy = charBody.position.y - item.body.position.y;
           const dz = charBody.position.z - item.body.position.z;
@@ -135,12 +138,13 @@ const Interaction = ({
               a.time = anim.start;
             });
 
-            // Cache et freeze l'item
+            // Cache, freeze et marque comme consommé
             item.mesh.visible = false;
             item.body.mass = 0;
             item.body.updateMassProperties();
             item.body.velocity.set(0, 0, 0);
             item.body.angularVelocity.set(0, 0, 0);
+            item.consumed = true;
 
             break;
           }
