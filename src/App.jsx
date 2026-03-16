@@ -519,7 +519,9 @@ const App = () => {
       lastTime = now;
 
       world.step(1 / 60, dt, 3);
-      mixerRef.current?.update(dt);
+      if (isIntroRef.current) {
+        mixerRef.current?.update(dt);
+      }
 
       // Eye flipbook
       const eyeMat = eyeMaterialRef.current;
