@@ -134,6 +134,14 @@ const Interaction = ({
               a.enabled = true;
               a.time = anim.start;
             });
+
+            // Cache et freeze l'item
+            item.mesh.visible = false;
+            item.body.mass = 0;
+            item.body.updateMassProperties();
+            item.body.velocity.set(0, 0, 0);
+            item.body.angularVelocity.set(0, 0, 0);
+
             break;
           }
         }
