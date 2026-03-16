@@ -25,7 +25,8 @@ const Interaction = ({
   characterBody,
   isIntroRef,
   skeletonRef,
-  healthManager, // ✅ reçu depuis App.jsx
+  healthManager,
+  world,
 }) => {
   const phaseRef = useRef(PHASE_LOOP);
   const initializedRef = useRef(false);
@@ -117,17 +118,62 @@ const Interaction = ({
         const charBody = characterBody?.current;
         if (!items?.length || !charBody) return;
 
-        for (const item of items) {
+        for (const item of [...items]) {
           if (!item?.body || item.consumed) continue;
 
           const dx = charBody.position.x - item.body.position.x;
           const dy = charBody.position.y - item.body.position.y;
           const dz = charBody.position.z - item.body.position.z;
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-          if (Math.sqrt(dx * dx + dy * dy + dz * dz) < COLLISION_DISTANCE) {
+          console.log(
+            "check item:",
+            item.modelName,
+            "| consumed:",
+            item.consumed,
+            "| dist:",
+            dist.toFixed(3),
+            "| idx:",
+            spawnedItems.current.indexOf(item),
+          );
+
+          if (dist < COLLISION_DISTANCE) {
             const anim = ITEM_ANIM[item.modelName];
             if (!anim) continue;
 
+            console.log("→ COLLISION avec:", item.modelName);
+
+            // EN PREMIER — bloque toute re-détection
+            item.consumed = true;
+
+            item.body.collisionFilterGroup = 0;
+            item.body.collisionFilterMask = 0;
+
+            if (world?.current) {
+              world.current.removeBody(item.body);
+            }
+            const idx = spawnedItems.current.indexOf(item);
+            if (idx !== -1) spawnedItems.current.splice(idx, 1);
+
+            item.mesh.visible = false;
+
+            // Retire du monde physique
+            item.body.position.set(9999, 9999, 9999);
+            item.body.velocity.set(0, 0, 0);
+            item.body.angularVelocity.set(0, 0, 0);
+            item.body.mass = 0;
+            item.body.updateMassProperties();
+            if (world?.current) world.current.removeBody(item.body);
+
+            // Cache le mesh
+            item.mesh.visible = false;
+
+            // Applique l'effet sur la barre de vie
+            if (healthManager && item.stats) {
+              healthManager.applyItemEffect(item.stats);
+            }
+
+            // Lance l'animation
             currentAnimRef.current = anim;
             phaseRef.current = PHASE_REACT;
             if (isIntroRef) isIntroRef.current = true;
@@ -138,22 +184,6 @@ const Interaction = ({
               a.enabled = true;
               a.time = anim.start;
             });
-
-            // ✅ Applique l'effet sur la barre de vie
-            if (healthManager && item.stats) {
-              healthManager.applyItemEffect(item.stats);
-              console.log(
-                `💥 ${item.modelName} → effet: ${JSON.stringify(item.stats)}`,
-              );
-            }
-
-            // Cache, freeze et marque comme consommé
-            item.mesh.visible = false;
-            item.body.mass = 0;
-            item.body.updateMassProperties();
-            item.body.velocity.set(0, 0, 0);
-            item.body.angularVelocity.set(0, 0, 0);
-            item.consumed = true;
 
             break;
           }
@@ -190,6 +220,7 @@ const Interaction = ({
     isIntroRef,
     skeletonRef,
     healthManager,
+    world,
   ]);
 
   return null;

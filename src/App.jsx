@@ -579,6 +579,7 @@ const App = () => {
           isIntroRef={isIntroRef}
           skeletonRef={skeletonRef}
           healthManager={healthManagerRef.current}
+          world={worldRef}
         />
       )}
       <canvas
