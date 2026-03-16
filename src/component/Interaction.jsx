@@ -5,7 +5,6 @@ const ANIM_FPS = 25;
 const COLLISION_DISTANCE = 1.2;
 
 const LOOP_CLIP_NAME = "ArmatureAction.001";
-
 const LOOP_START = 150 / ANIM_FPS;
 const LOOP_END = 300 / ANIM_FPS;
 
@@ -33,9 +32,8 @@ const Interaction = ({
   const rafCheckRef = useRef(null);
   const cooldownRef = useRef(0);
   const currentAnimRef = useRef(null);
-  const actionRef = useRef(null);
+  const actionsRef = useRef([]);
 
-  // ── Init ──
   useEffect(() => {
     const tryInit = () => {
       const mixer = mixerRef?.current;
@@ -44,37 +42,28 @@ const Interaction = ({
         return;
       }
 
-      // Stoppe et désactive TOUS les clips sans exception
       mixer.stopAllAction();
-      rawClips.forEach((clip) => {
-        const a = mixer.clipAction(clip);
-        a.enabled = false;
-        a.weight = 0;
-        a.stop();
-      });
 
-      // Trouve le clip principal
       const loopClip = rawClips.find((c) => c.name === LOOP_CLIP_NAME);
       if (!loopClip) {
-        console.warn("Clip introuvable :", LOOP_CLIP_NAME);
         rafInitRef.current = requestAnimationFrame(tryInit);
         return;
       }
 
-      // Calcule la fin réelle de knife depuis la durée du clip
       ITEM_ANIM.knife.end = loopClip.duration - 0.05;
 
-      // Lance UNIQUEMENT l'action principale
-      const action = mixer.clipAction(loopClip);
-      action.enabled = true;
-      action.weight = 1;
-      action.setLoop(THREE.LoopOnce, 1);
-      action.clampWhenFinished = true;
-      action.time = LOOP_START;
-      action.play();
-      actionRef.current = action;
+      const actions = rawClips.map((clip) => {
+        const action = mixer.clipAction(clip);
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+        action.time = LOOP_START;
+        action.enabled = true;
+        action.paused = false;
+        action.play();
+        return action;
+      });
+      actionsRef.current = actions;
 
-      // Attend quelques frames puis capture la rest pose
       let waitFrames = 0;
       const waitAndCapture = () => {
         if (++waitFrames < 4) {
@@ -94,19 +83,26 @@ const Interaction = ({
     return () => cancelAnimationFrame(rafInitRef.current);
   }, [mixerRef, rawClips, skeletonRef]);
 
-  // ── Boucle de contrôle ──
   useEffect(() => {
     const check = () => {
       rafCheckRef.current = requestAnimationFrame(check);
       if (!initializedRef.current) return;
 
-      const action = actionRef.current;
-      if (!action) return;
+      const actions = actionsRef.current;
+      if (!actions.length) return;
 
-      // ── LOOP : maintient entre LOOP_START et LOOP_END ──
+      const mainAction = actions.find(
+        (a) => a.getClip().name === LOOP_CLIP_NAME,
+      );
+      if (!mainAction) return;
+
       if (phaseRef.current === PHASE_LOOP) {
-        if (action.time >= LOOP_END || action.time < LOOP_START) {
-          action.time = LOOP_START;
+        if (mainAction.time >= LOOP_END || mainAction.time < LOOP_START) {
+          actions.forEach((a) => {
+            a.paused = false;
+            a.enabled = true;
+            a.time = LOOP_START;
+          });
         }
 
         if (cooldownRef.current > 0) {
@@ -114,7 +110,6 @@ const Interaction = ({
           return;
         }
 
-        // Détection collision
         const items = spawnedItems?.current;
         const charBody = characterBody?.current;
         if (!items?.length || !charBody) return;
@@ -133,19 +128,25 @@ const Interaction = ({
             phaseRef.current = PHASE_REACT;
             if (isIntroRef) isIntroRef.current = true;
             skeletonRef?.current?.freezeSprings();
-            action.time = anim.start;
+
+            actions.forEach((a) => {
+              a.paused = false;
+              a.enabled = true;
+              a.time = anim.start;
+            });
             break;
           }
         }
-      }
-
-      // ── REACT : joue jusqu'à anim.end puis retour loop ──
-      else if (phaseRef.current === PHASE_REACT) {
+      } else if (phaseRef.current === PHASE_REACT) {
         const anim = currentAnimRef.current;
         if (!anim) return;
 
-        if (action.time >= anim.end) {
-          action.time = LOOP_START;
+        if (mainAction.time >= anim.end) {
+          actions.forEach((a) => {
+            a.paused = false;
+            a.enabled = true;
+            a.time = LOOP_START;
+          });
           phaseRef.current = PHASE_LOOP;
           currentAnimRef.current = null;
           cooldownRef.current = 60;
