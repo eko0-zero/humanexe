@@ -25,6 +25,7 @@ const Interaction = ({
   characterBody,
   isIntroRef,
   skeletonRef,
+  healthManager, // ✅ reçu depuis App.jsx
 }) => {
   const phaseRef = useRef(PHASE_LOOP);
   const initializedRef = useRef(false);
@@ -138,6 +139,14 @@ const Interaction = ({
               a.time = anim.start;
             });
 
+            // ✅ Applique l'effet sur la barre de vie
+            if (healthManager && item.stats) {
+              healthManager.applyItemEffect(item.stats);
+              console.log(
+                `💥 ${item.modelName} → effet: ${JSON.stringify(item.stats)}`,
+              );
+            }
+
             // Cache, freeze et marque comme consommé
             item.mesh.visible = false;
             item.body.mass = 0;
@@ -174,7 +183,14 @@ const Interaction = ({
 
     rafCheckRef.current = requestAnimationFrame(check);
     return () => cancelAnimationFrame(rafCheckRef.current);
-  }, [mixerRef, spawnedItems, characterBody, isIntroRef, skeletonRef]);
+  }, [
+    mixerRef,
+    spawnedItems,
+    characterBody,
+    isIntroRef,
+    skeletonRef,
+    healthManager,
+  ]);
 
   return null;
 };

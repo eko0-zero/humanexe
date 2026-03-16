@@ -7,6 +7,7 @@ import Trash from "./component/trash.jsx";
 import ButtonAddItem from "./component/ButtonAddItems.jsx";
 import Skeleton from "./component/Skeleton.jsx";
 import Interaction from "./component/Interaction.jsx";
+import { HealthManager, HealthBar } from "./component/Healthbar.jsx";
 
 const MODEL_PATH = "./3D/models/character.glb";
 const GROUND_Y = -1;
@@ -187,6 +188,9 @@ const App = () => {
 
   const isDraggingRef = useRef(false);
   const mouseWorldRef = useRef(new THREE.Vector3());
+
+  // ✅ HealthManager instancié une seule fois via useRef
+  const healthManagerRef = useRef(new HealthManager(200));
 
   const [ready, setReady] = useState(false);
   const [model, setModel] = useState(null);
@@ -501,6 +505,7 @@ const App = () => {
     renderer.domElement.addEventListener("drop", onDrop);
 
     setReady(true);
+
     return () => {
       cancelAnimationFrame(animId);
       mixerRef.current?.stopAllAction();
@@ -523,6 +528,8 @@ const App = () => {
 
   return (
     <main className="relative w-full h-screen">
+      {/* ✅ healthManagerRef.current passé comme prop */}
+      <HealthBar healthManager={healthManagerRef.current} />
       <p className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
         Click on "space" or "esc" to open the menu.
       </p>
@@ -533,6 +540,7 @@ const App = () => {
         renderer={rendererRef.current}
         spawnedItems={spawnedItemsRef}
         characterBody={characterBodyRef.current}
+        healthManager={healthManagerRef.current}
         getViewBounds={() => {
           const camera = cameraRef.current;
           const mesh = meshRef.current;
@@ -551,6 +559,7 @@ const App = () => {
           spawnedItems={spawnedItemsRef}
           world={worldRef.current}
           renderer={rendererRef.current}
+          healthManager={healthManagerRef.current}
         />
       )}
       {model && (
@@ -569,12 +578,13 @@ const App = () => {
           characterBody={characterBodyRef}
           isIntroRef={isIntroRef}
           skeletonRef={skeletonRef}
+          healthManager={healthManagerRef.current}
         />
       )}
       <canvas
         ref={canvasRef}
         style={{ display: "block", position: "absolute", top: 0, left: 0 }}
-      ></canvas>
+      />
     </main>
   );
 };
