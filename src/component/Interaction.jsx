@@ -15,6 +15,15 @@ const ITEM_ANIM = {
   knife: { start: 600 / ANIM_FPS, end: null },
 };
 
+// Plages de frames des yeux pour chaque état
+const EYE_ANIM = {
+  loop: { start: 150, end: 300 },
+  bat: { start: 0, end: 149 },
+  plushie: { start: 301, end: 449 },
+  waffle: { start: 450, end: 599 },
+  knife: { start: 600, end: 749 },
+};
+
 const PHASE_LOOP = "loop";
 const PHASE_REACT = "react";
 
@@ -27,6 +36,7 @@ const Interaction = ({
   skeletonRef,
   healthManager,
   world,
+  onEyeRangeChange, // ← nouveau callback : ({ start, end }) => void
 }) => {
   const phaseRef = useRef(PHASE_LOOP);
   const initializedRef = useRef(false);
@@ -83,6 +93,9 @@ const Interaction = ({
         initializedRef.current = true;
         phaseRef.current = PHASE_LOOP;
         if (isIntroRef) isIntroRef.current = false;
+
+        // Démarre avec la plage yeux du loop
+        onEyeRangeChange?.(EYE_ANIM.loop);
       };
       requestAnimationFrame(waitAndCapture);
     };
@@ -110,7 +123,6 @@ const Interaction = ({
       if (!mainAction) return;
 
       if (phaseRef.current === PHASE_LOOP) {
-        // Remet la boucle idle si on a dépassé la fin ou on est avant le début
         if (mainAction.time >= LOOP_END || mainAction.time < LOOP_START) {
           actions.forEach((a) => {
             a.paused = false;
@@ -127,7 +139,6 @@ const Interaction = ({
         const items = spawnedItems?.current;
         const charBody = characterBody?.current;
 
-        // Guard robuste — retente au prochain frame si pas encore prêt
         if (!charBody || !items?.length) return;
 
         for (const item of [...items]) {
@@ -142,22 +153,17 @@ const Interaction = ({
             const anim = ITEM_ANIM[item.modelName];
             if (!anim) continue;
 
-            // Marque l'item comme consommé immédiatement pour éviter re-détection
             item.consumed = true;
 
-            // Retire du monde physique (une seule fois)
             if (world?.current) {
               world.current.removeBody(item.body);
             }
 
-            // Retire de la liste des items actifs
             const idx = spawnedItems.current.indexOf(item);
             if (idx !== -1) spawnedItems.current.splice(idx, 1);
 
-            // Cache le mesh
             item.mesh.visible = false;
 
-            // Neutralise le body pour éviter interactions résiduelles
             item.body.collisionFilterGroup = 0;
             item.body.collisionFilterMask = 0;
             item.body.position.set(9999, 9999, 9999);
@@ -166,12 +172,14 @@ const Interaction = ({
             item.body.mass = 0;
             item.body.updateMassProperties();
 
-            // Applique l'effet sur la barre de vie
             if (healthManager && item.stats) {
               healthManager.applyItemEffect(item.stats);
             }
 
-            // Lance l'animation de réaction
+            // Change la plage des yeux selon l'item
+            const eyeRange = EYE_ANIM[item.modelName];
+            if (eyeRange) onEyeRangeChange?.(eyeRange);
+
             currentAnimRef.current = anim;
             phaseRef.current = PHASE_REACT;
             if (isIntroRef) isIntroRef.current = true;
@@ -200,6 +208,9 @@ const Interaction = ({
           currentAnimRef.current = null;
           cooldownRef.current = 60;
 
+          // Retour à la plage yeux du loop
+          onEyeRangeChange?.(EYE_ANIM.loop);
+
           requestAnimationFrame(() => {
             skeletonRef?.current?.captureRestPose();
             skeletonRef?.current?.unfreezeSprings();
@@ -219,6 +230,7 @@ const Interaction = ({
     skeletonRef,
     healthManager,
     world,
+    onEyeRangeChange,
   ]);
 
   return null;

@@ -105,17 +105,9 @@ function loadModel(scene, placeholderCube) {
           allMeshesInModel.map((m) => m.name),
         );
 
-        // --- CACHE CHAQUE MESH UN PAR UN POUR TROUVER LEQUEL EST L'ŒIL ---
-        // Change le chiffre (0 à 7) et regarde ce qui disparaît dans le navigateur
-        // Une fois trouvé, note le nom et on remplace la ligne eyeMesh ci-dessous
-        // allMeshesInModel.forEach((m, i) => { m.visible = i !== 0; });
-        // --------------------------------------------------------------------
-
-        // Pour l'instant on prend le dernier mesh (model001_7) comme candidat
-        // À CHANGER selon ce que tu vois avec le test ci-dessus
+        // model001_7 = candidat yeux — à ajuster si besoin
         const eyeMesh =
           allMeshesInModel.find((m) => m.name === "model001_4") ?? null;
-
         console.log("eyeMesh sélectionné :", eyeMesh?.name ?? "aucun");
 
         model.traverse((node) => {
@@ -199,6 +191,10 @@ const App = () => {
   const eyeFrameRef = useRef(EYE_START_FRAME);
   const eyeTimeAccRef = useRef(0);
 
+  // Plage dynamique des yeux — modifiée par Interaction via onEyeRangeChange
+  const eyeStartRef = useRef(EYE_START_FRAME);
+  const eyeEndRef = useRef(EYE_END_FRAME);
+
   const meshRef = useRef(null);
   const characterBodyRef = useRef(null);
 
@@ -281,7 +277,7 @@ const App = () => {
 
         const texLoader = new THREE.TextureLoader();
         const loadNext = (i) => {
-          if (i > EYE_END_FRAME) return;
+          if (i >= EYE_FRAME_COUNT) return;
           const path = getEyeTexturePath(i);
           texLoader.load(
             path,
@@ -306,7 +302,8 @@ const App = () => {
             },
           );
         };
-        loadNext(EYE_START_FRAME);
+        // Charge toutes les frames (0 → 748) pour couvrir toutes les plages
+        loadNext(0);
       } else {
         console.warn(
           "⚠️ eyeMesh est null — vérifie le nom du mesh dans loadModel",
@@ -465,10 +462,15 @@ const App = () => {
         eyeTimeAccRef.current += dt;
         if (eyeTimeAccRef.current >= EYE_FRAME_DURATION) {
           eyeTimeAccRef.current -= EYE_FRAME_DURATION;
-          let next = eyeFrameRef.current + 1;
-          if (next > EYE_END_FRAME) next = EYE_START_FRAME;
 
-          const rangeSize = EYE_END_FRAME - EYE_START_FRAME + 1;
+          const start = eyeStartRef.current;
+          const end = eyeEndRef.current;
+
+          let next = eyeFrameRef.current + 1;
+          // Reset si hors de la plage courante
+          if (next < start || next > end) next = start;
+
+          const rangeSize = end - start + 1;
           let found = false;
           for (let tries = 0; tries < rangeSize; tries++) {
             if (eyeTexturesRef.current[next] !== null) {
@@ -476,7 +478,7 @@ const App = () => {
               break;
             }
             next++;
-            if (next > EYE_END_FRAME) next = EYE_START_FRAME;
+            if (next > end) next = start;
           }
           if (found) {
             eyeFrameRef.current = next;
@@ -610,6 +612,11 @@ const App = () => {
           skeletonRef={skeletonRef}
           healthManager={healthManagerRef.current}
           world={worldRef}
+          onEyeRangeChange={({ start, end }) => {
+            eyeStartRef.current = start;
+            eyeEndRef.current = end;
+            eyeFrameRef.current = start;
+          }}
         />
       )}
       <canvas
