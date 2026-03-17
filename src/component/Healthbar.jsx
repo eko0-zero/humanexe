@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 export class HealthManager {
   constructor(maxHealth = 200) {
     this.maxHealth = maxHealth;
-    this.currentHealth = 50;
+    this.currentHealth = 100;
     this.healthChangeCallbacks = [];
   }
 
@@ -114,9 +114,9 @@ export function HealthBar({ healthManager }) {
             {Math.ceil(displayPercentage)}%
           </span>
         </div>
-        <div className="health-bar-background bg-emerald-400 h-4.5 rounded-[100px]">
+        <div className="health-bar-background bg-linear-to-r from-[#D9D9D9] to-[#CECECE] h-4.5 rounded-[100px]">
           <div
-            className={`health-bar-fill bg-blue-500 h-4.5 rounded-[100px] ${isLowHealth ? "low-health bg-blue-500 rounded-[100px" : ""} ${isCritical ? "critical bg-blue-500 rounded-[100px" : ""}`}
+            className={`health-bar-fill h-4.5 bg-linear-to-r from-[#18C52F] to-[#7CDC89] rounded-[100px] ${isLowHealth ? "low-health  bg-linear-to-r from-[#F89000] to-[#F7C862]" : ""} ${isCritical ? "critical  bg-linear-to-r from-[#E40000] to-[#EA3F3F] " : ""}`}
             style={{
               width: `${healthPercentage}%`,
               transition: "width 0.3s ease-out",
