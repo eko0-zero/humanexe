@@ -38,7 +38,11 @@ const Interaction = ({
 
   // ── Init ──
   useEffect(() => {
+    let cancelled = false;
+
     const tryInit = () => {
+      if (cancelled) return;
+
       const mixer = mixerRef?.current;
       if (!mixer || !rawClips || rawClips.length === 0) {
         rafInitRef.current = requestAnimationFrame(tryInit);
@@ -69,6 +73,7 @@ const Interaction = ({
 
       let waitFrames = 0;
       const waitAndCapture = () => {
+        if (cancelled) return;
         if (++waitFrames < 4) {
           requestAnimationFrame(waitAndCapture);
           return;
@@ -83,7 +88,11 @@ const Interaction = ({
     };
 
     rafInitRef.current = requestAnimationFrame(tryInit);
-    return () => cancelAnimationFrame(rafInitRef.current);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafInitRef.current);
+    };
   }, [mixerRef, rawClips, skeletonRef]);
 
   // ── Boucle de contrôle ──
@@ -101,6 +110,7 @@ const Interaction = ({
       if (!mainAction) return;
 
       if (phaseRef.current === PHASE_LOOP) {
+        // Remet la boucle idle si on a dépassé la fin ou on est avant le début
         if (mainAction.time >= LOOP_END || mainAction.time < LOOP_START) {
           actions.forEach((a) => {
             a.paused = false;
@@ -116,7 +126,9 @@ const Interaction = ({
 
         const items = spawnedItems?.current;
         const charBody = characterBody?.current;
-        if (!items?.length || !charBody) return;
+
+        // Guard robuste — retente au prochain frame si pas encore prêt
+        if (!charBody || !items?.length) return;
 
         for (const item of [...items]) {
           if (!item?.body || item.consumed) continue;
@@ -126,54 +138,40 @@ const Interaction = ({
           const dz = charBody.position.z - item.body.position.z;
           const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-          console.log(
-            "check item:",
-            item.modelName,
-            "| consumed:",
-            item.consumed,
-            "| dist:",
-            dist.toFixed(3),
-            "| idx:",
-            spawnedItems.current.indexOf(item),
-          );
-
           if (dist < COLLISION_DISTANCE) {
             const anim = ITEM_ANIM[item.modelName];
             if (!anim) continue;
 
-            console.log("→ COLLISION avec:", item.modelName);
-
-            // EN PREMIER — bloque toute re-détection
+            // Marque l'item comme consommé immédiatement pour éviter re-détection
             item.consumed = true;
 
-            item.body.collisionFilterGroup = 0;
-            item.body.collisionFilterMask = 0;
-
+            // Retire du monde physique (une seule fois)
             if (world?.current) {
               world.current.removeBody(item.body);
             }
+
+            // Retire de la liste des items actifs
             const idx = spawnedItems.current.indexOf(item);
             if (idx !== -1) spawnedItems.current.splice(idx, 1);
 
+            // Cache le mesh
             item.mesh.visible = false;
 
-            // Retire du monde physique
+            // Neutralise le body pour éviter interactions résiduelles
+            item.body.collisionFilterGroup = 0;
+            item.body.collisionFilterMask = 0;
             item.body.position.set(9999, 9999, 9999);
             item.body.velocity.set(0, 0, 0);
             item.body.angularVelocity.set(0, 0, 0);
             item.body.mass = 0;
             item.body.updateMassProperties();
-            if (world?.current) world.current.removeBody(item.body);
-
-            // Cache le mesh
-            item.mesh.visible = false;
 
             // Applique l'effet sur la barre de vie
             if (healthManager && item.stats) {
               healthManager.applyItemEffect(item.stats);
             }
 
-            // Lance l'animation
+            // Lance l'animation de réaction
             currentAnimRef.current = anim;
             phaseRef.current = PHASE_REACT;
             if (isIntroRef) isIntroRef.current = true;
