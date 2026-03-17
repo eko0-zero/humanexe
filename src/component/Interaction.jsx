@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 const ANIM_FPS = 25;
-const COLLISION_DISTANCE = 1.2;
 
 const LOOP_CLIP_NAME = "ArmatureAction.001";
 const LOOP_START = 150 / ANIM_FPS;
@@ -15,7 +14,6 @@ const ITEM_ANIM = {
   knife: { start: 600 / ANIM_FPS, end: null },
 };
 
-// Plages de frames des yeux pour chaque état
 const EYE_ANIM = {
   loop: { start: 150, end: 300 },
   bat: { start: 0, end: 149 },
@@ -27,6 +25,12 @@ const EYE_ANIM = {
 const PHASE_LOOP = "loop";
 const PHASE_REACT = "react";
 
+// ── Hitbox du personnage — ajuste ces 4 valeurs ──
+const HITBOX_X = 0.6;        // largeur   (gauche / droite)
+const HITBOX_Y = 1.6;        // hauteur   (bas / haut)
+const HITBOX_Z = 0.5;        // profondeur (avant / arrière)
+const HITBOX_Y_OFFSET = 0.5; // décale le centre vers le haut du modèle
+
 const Interaction = ({
   mixerRef,
   rawClips,
@@ -37,7 +41,7 @@ const Interaction = ({
   skeletonRef,
   healthManager,
   world,
-  onEyeRangeChange, // ← nouveau callback : ({ start, end }) => void
+  onEyeRangeChange,
 }) => {
   const phaseRef = useRef(PHASE_LOOP);
   const initializedRef = useRef(false);
@@ -94,8 +98,6 @@ const Interaction = ({
         initializedRef.current = true;
         phaseRef.current = PHASE_LOOP;
         if (isIntroRef) isIntroRef.current = false;
-
-        // Démarre avec la plage yeux du loop
         onEyeRangeChange?.(EYE_ANIM.loop);
       };
       requestAnimationFrame(waitAndCapture);
@@ -119,7 +121,7 @@ const Interaction = ({
       if (!actions.length) return;
 
       const mainAction = actions.find(
-        (a) => a.getClip().name === LOOP_CLIP_NAME,
+        (a) => a.getClip().name === LOOP_CLIP_NAME
       );
       if (!mainAction) return;
 
@@ -141,60 +143,58 @@ const Interaction = ({
         const charBody = characterBody?.current;
 
         if (!charBody || !items?.length) return;
-        if (isDraggingRef?.current) return; 
+        if (isDraggingRef?.current) return;
 
         for (const item of [...items]) {
           if (!item?.body || item.consumed) continue;
 
-          const dx = charBody.position.x - item.body.position.x;
-          const dy = charBody.position.y - item.body.position.y;
-          const dz = charBody.position.z - item.body.position.z;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          const anim = ITEM_ANIM[item.modelName];
+          if (!anim) continue;
 
-          if (dist < COLLISION_DISTANCE) {
-            const anim = ITEM_ANIM[item.modelName];
-            if (!anim) continue;
+          const dx = Math.abs(charBody.position.x - item.body.position.x);
+          const dy = Math.abs((charBody.position.y + HITBOX_Y_OFFSET) - item.body.position.y);
+          const dz = Math.abs(charBody.position.z - item.body.position.z);
 
-            item.consumed = true;
+          if (dx > HITBOX_X || dy > HITBOX_Y || dz > HITBOX_Z) continue;
 
-            if (world?.current) {
-              world.current.removeBody(item.body);
-            }
+          item.consumed = true;
 
-            const idx = spawnedItems.current.indexOf(item);
-            if (idx !== -1) spawnedItems.current.splice(idx, 1);
-
-            item.mesh.visible = false;
-
-            item.body.collisionFilterGroup = 0;
-            item.body.collisionFilterMask = 0;
-            item.body.position.set(9999, 9999, 9999);
-            item.body.velocity.set(0, 0, 0);
-            item.body.angularVelocity.set(0, 0, 0);
-            item.body.mass = 0;
-            item.body.updateMassProperties();
-
-            if (healthManager && item.stats) {
-              healthManager.applyItemEffect(item.stats);
-            }
-
-            // Change la plage des yeux selon l'item
-            const eyeRange = EYE_ANIM[item.modelName];
-            if (eyeRange) onEyeRangeChange?.(eyeRange);
-
-            currentAnimRef.current = anim;
-            phaseRef.current = PHASE_REACT;
-            if (isIntroRef) isIntroRef.current = true;
-            skeletonRef?.current?.freezeSprings();
-
-            actions.forEach((a) => {
-              a.paused = false;
-              a.enabled = true;
-              a.time = anim.start;
-            });
-
-            break;
+          if (world?.current) {
+            world.current.removeBody(item.body);
           }
+
+          const idx = spawnedItems.current.indexOf(item);
+          if (idx !== -1) spawnedItems.current.splice(idx, 1);
+
+          item.mesh.visible = false;
+
+          item.body.collisionFilterGroup = 0;
+          item.body.collisionFilterMask = 0;
+          item.body.position.set(9999, 9999, 9999);
+          item.body.velocity.set(0, 0, 0);
+          item.body.angularVelocity.set(0, 0, 0);
+          item.body.mass = 0;
+          item.body.updateMassProperties();
+
+          if (healthManager && item.stats) {
+            healthManager.applyItemEffect(item.stats);
+          }
+
+          const eyeRange = EYE_ANIM[item.modelName];
+          if (eyeRange) onEyeRangeChange?.(eyeRange);
+
+          currentAnimRef.current = anim;
+          phaseRef.current = PHASE_REACT;
+          if (isIntroRef) isIntroRef.current = true;
+          skeletonRef?.current?.freezeSprings();
+
+          actions.forEach((a) => {
+            a.paused = false;
+            a.enabled = true;
+            a.time = anim.start;
+          });
+
+          break;
         }
       } else if (phaseRef.current === PHASE_REACT) {
         const anim = currentAnimRef.current;
@@ -210,7 +210,6 @@ const Interaction = ({
           currentAnimRef.current = null;
           cooldownRef.current = 60;
 
-          // Retour à la plage yeux du loop
           onEyeRangeChange?.(EYE_ANIM.loop);
 
           requestAnimationFrame(() => {
