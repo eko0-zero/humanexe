@@ -33,6 +33,7 @@ const Interaction = ({
   spawnedItems,
   characterBody,
   isIntroRef,
+  isDraggingRef,
   skeletonRef,
   healthManager,
   world,
@@ -140,6 +141,7 @@ const Interaction = ({
         const charBody = characterBody?.current;
 
         if (!charBody || !items?.length) return;
+        if (isDraggingRef?.current) return; 
 
         for (const item of [...items]) {
           if (!item?.body || item.consumed) continue;

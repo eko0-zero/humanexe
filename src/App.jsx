@@ -442,7 +442,6 @@ const App = () => {
     const updateLightTarget = () => {
       const m = meshRef.current;
       if (!m) return;
-      dirLight.target.position.copy(m.position);
       dirLight.target.updateMatrixWorld();
     };
 
@@ -611,6 +610,7 @@ const App = () => {
           spawnedItems={spawnedItemsRef}
           characterBody={characterBodyRef}
           isIntroRef={isIntroRef}
+          isDraggingRef={isDraggingRef}  
           skeletonRef={skeletonRef}
           healthManager={healthManagerRef.current}
           world={worldRef}
@@ -618,7 +618,10 @@ const App = () => {
             eyeStartRef.current = start;
             eyeEndRef.current = end;
             eyeFrameRef.current = start;
+           
           }}
+
+          
         />
       )}
       <canvas
