@@ -103,6 +103,7 @@ export function HealthBar({ healthManager }) {
   const displayPercentage = (health / maxHealth) * 200;
   const isLowHealth = health / maxHealth < 0.35;
   const isCritical = health / maxHealth < 0.2;
+  const isVeryGood = health / maxHealth > 0.7;
 
   return (
     <div className="health-bar-container py-5 z-10 ">
@@ -110,16 +111,36 @@ export function HealthBar({ healthManager }) {
         className={`health-bar-wrapper ${showDamageEffect ? "damage-flash" : ""}`}
       >
         <div className="health-text">
-          <span className="health-percentage ont-host font-regular text-[1.4rem] left-5 m-[calc(50%-1.4rem)] ">
+          <span
+            className={`health-percentage ont-host font-regular text-[1.4rem] left-5 m-[calc(50%-1.4rem)] ${isCritical ? "critical" : isLowHealth ? "low-health" : ""}`}
+            style={{
+              width: `${healthPercentage}%`,
+              transition: "0.3s ease-out",
+              color: isVeryGood
+                ? "#105D84"
+                : isCritical
+                  ? "#AF1111"
+                  : isLowHealth
+                    ? "#AF7F11"
+                    : "#108420",
+            }}
+          >
             {Math.ceil(displayPercentage)}%
           </span>
         </div>
         <div className="health-bar-background bg-linear-to-r from-[#D9D9D9] to-[#CECECE] h-4.5 rounded-[100px]">
           <div
-            className={`health-bar-fill h-4.5 bg-linear-to-r from-[#18C52F] to-[#7CDC89] rounded-[100px] ${isLowHealth ? "low-health  bg-linear-to-r from-[#F89000] to-[#F7C862]" : ""} ${isCritical ? "critical  bg-linear-to-r from-[#E40000] to-[#EA3F3F] " : ""}`}
+            className={`health-bar-fill h-4.5 rounded-[100px] ${isCritical ? "critical" : isLowHealth ? "low-health" : ""}`}
             style={{
               width: `${healthPercentage}%`,
-              transition: "width 0.3s ease-out",
+              transition: " width 5s ease-out",
+              background: isVeryGood
+                ? "linear-gradient(to right, #0079F2, #67ADF4)"
+                : isCritical
+                  ? "linear-gradient(to right, #E40000, #EA3F3F)"
+                  : isLowHealth
+                    ? "linear-gradient(to right, #F89000, #F7C862)"
+                    : "linear-gradient(to right, #18C52F, #7CDC89)",
             }}
           >
             <div className="health-bar-shine" />

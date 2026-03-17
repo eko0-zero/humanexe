@@ -21,22 +21,22 @@ const ITEM_MODELS = [
   {
     name: "waffle",
     path: "./3D/models/waffle.glb",
-    stats: { health: 10, weight: 1, speed: 3, rarity: 1 },
+    stats: { health: 20, weight: 1, speed: 3, rarity: 1 },
   },
   {
     name: "bat",
     path: "./3D/models/bat.glb",
-    stats: { health: -15, weight: 2, speed: 2, rarity: 1 },
+    stats: { health: -30, weight: 2, speed: 2, rarity: 1 },
   },
   {
     name: "plushie",
     path: "./3D/models/plushie.glb",
-    stats: { health: 5, weight: 1, speed: 5, rarity: 1 },
+    stats: { health: 10, weight: 1, speed: 5, rarity: 1 },
   },
   {
     name: "knife",
     path: "./3D/models/knife.glb",
-    stats: { health: -25, weight: 3, speed: 1, rarity: 1 },
+    stats: { health: -50, weight: 3, speed: 1, rarity: 1 },
   },
 ];
 
