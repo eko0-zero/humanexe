@@ -13,15 +13,15 @@ const MODEL_PATH = "./3D/models/character.glb";
 const GROUND_Y = -1;
 const MODEL_Y_OFFSET = -0.5;
 
-const EYE_FRAME_COUNT = 247;
+const EYE_FRAME_COUNT = 749;
 const EYE_FPS = 25;
 const EYE_FRAME_DURATION = 1 / EYE_FPS;
-const EYE_START_FRAME = 149;
-const EYE_END_FRAME = 246;
+const EYE_START_FRAME = 150;
+const EYE_END_FRAME = 300;
 
 const getEyeTexturePath = (index) => {
   const padded = String(index + 1).padStart(3, "0");
-  return `./3D/textures/eyes/eyes_${padded}.png`;
+  return `./3D/textures/eyes/eyes_${padded}.webp`;
 };
 
 function createCamera(aspect) {
@@ -95,12 +95,28 @@ function loadModel(scene, placeholderCube) {
 
         const allMeshesInModel = [];
         model.traverse((n) => {
-          if (n.isMesh) allMeshesInModel.push(n);
+          if (n.isMesh && n.name.startsWith("model001")) {
+            allMeshesInModel.push(n);
+          }
         });
 
+        console.log(
+          "Meshes trouvés :",
+          allMeshesInModel.map((m) => m.name),
+        );
+
+        // --- CACHE CHAQUE MESH UN PAR UN POUR TROUVER LEQUEL EST L'ŒIL ---
+        // Change le chiffre (0 à 7) et regarde ce qui disparaît dans le navigateur
+        // Une fois trouvé, note le nom et on remplace la ligne eyeMesh ci-dessous
+        // allMeshesInModel.forEach((m, i) => { m.visible = i !== 0; });
+        // --------------------------------------------------------------------
+
+        // Pour l'instant on prend le dernier mesh (model001_7) comme candidat
+        // À CHANGER selon ce que tu vois avec le test ci-dessus
         const eyeMesh =
-          allMeshesInModel.find((m) => m.name.toLowerCase().includes("eye")) ??
-          null;
+          allMeshesInModel.find((m) => m.name === "model001_4") ?? null;
+
+        console.log("eyeMesh sélectionné :", eyeMesh?.name ?? "aucun");
 
         model.traverse((node) => {
           if (node.isMesh) {
@@ -189,7 +205,6 @@ const App = () => {
   const isDraggingRef = useRef(false);
   const mouseWorldRef = useRef(new THREE.Vector3());
 
-  // ✅ HealthManager instancié une seule fois via useRef
   const healthManagerRef = useRef(new HealthManager(200));
 
   const [ready, setReady] = useState(false);
@@ -252,6 +267,7 @@ const App = () => {
       }
 
       if (eyeMesh) {
+        console.log("✅ eyeMesh trouvé, chargement des textures...");
         const eyeMat = new THREE.MeshBasicMaterial({
           transparent: true,
           alphaTest: 0,
@@ -265,10 +281,13 @@ const App = () => {
 
         const texLoader = new THREE.TextureLoader();
         const loadNext = (i) => {
-          if (i >= EYE_FRAME_COUNT) return;
+          if (i > EYE_END_FRAME) return;
+          const path = getEyeTexturePath(i);
           texLoader.load(
-            getEyeTexturePath(i),
+            path,
             (tex) => {
+              if (i === EYE_START_FRAME)
+                console.log("✅ première texture chargée :", path);
               tex.colorSpace = THREE.SRGBColorSpace;
               tex.flipY = false;
               eyeTexturesRef.current[i] = tex;
@@ -280,10 +299,18 @@ const App = () => {
               setTimeout(() => loadNext(i + 1), 0);
             },
             undefined,
-            () => setTimeout(() => loadNext(i + 1), 0),
+            (err) => {
+              if (i === EYE_START_FRAME)
+                console.warn("❌ échec première texture :", path, err);
+              setTimeout(() => loadNext(i + 1), 0);
+            },
           );
         };
-        loadNext(0);
+        loadNext(EYE_START_FRAME);
+      } else {
+        console.warn(
+          "⚠️ eyeMesh est null — vérifie le nom du mesh dans loadModel",
+        );
       }
 
       setModel(model);
@@ -440,19 +467,20 @@ const App = () => {
           eyeTimeAccRef.current -= EYE_FRAME_DURATION;
           let next = eyeFrameRef.current + 1;
           if (next > EYE_END_FRAME) next = EYE_START_FRAME;
-          let tries = 0;
-          while (
-            eyeTexturesRef.current[next] === null &&
-            tries < EYE_END_FRAME - EYE_START_FRAME + 1
-          ) {
+
+          const rangeSize = EYE_END_FRAME - EYE_START_FRAME + 1;
+          let found = false;
+          for (let tries = 0; tries < rangeSize; tries++) {
+            if (eyeTexturesRef.current[next] !== null) {
+              found = true;
+              break;
+            }
             next++;
             if (next > EYE_END_FRAME) next = EYE_START_FRAME;
-            tries++;
           }
-          const tex = eyeTexturesRef.current[next];
-          if (tex) {
+          if (found) {
             eyeFrameRef.current = next;
-            eyeMat.map = tex;
+            eyeMat.map = eyeTexturesRef.current[next];
             eyeMat.needsUpdate = true;
           }
         }
