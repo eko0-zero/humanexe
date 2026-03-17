@@ -105,13 +105,18 @@ export function HealthBar({ healthManager }) {
   const isCritical = health / maxHealth < 0.2;
 
   return (
-    <div className="health-bar-container">
+    <div className="health-bar-container py-5 z-10 ">
       <div
         className={`health-bar-wrapper ${showDamageEffect ? "damage-flash" : ""}`}
       >
-        <div className="health-bar-background">
+        <div className="health-text">
+          <span className="health-percentage ont-host font-regular text-[1.4rem] left-5 m-[calc(50%-1.4rem)] ">
+            {Math.ceil(displayPercentage)}%
+          </span>
+        </div>
+        <div className="health-bar-background bg-emerald-400 h-4.5 rounded-[100px]">
           <div
-            className={`health-bar-fill ${isLowHealth ? "low-health" : ""} ${isCritical ? "critical" : ""}`}
+            className={`health-bar-fill bg-blue-500 h-4.5 rounded-[100px] ${isLowHealth ? "low-health bg-blue-500 rounded-[100px" : ""} ${isCritical ? "critical bg-blue-500 rounded-[100px" : ""}`}
             style={{
               width: `${healthPercentage}%`,
               transition: "width 0.3s ease-out",
@@ -120,16 +125,9 @@ export function HealthBar({ healthManager }) {
             <div className="health-bar-shine" />
           </div>
         </div>
-        <div className="health-text">
-          <span className="health-percentage">
-            {Math.ceil(displayPercentage)}%
-          </span>
-        </div>
       </div>
 
-      {isCritical && <div className="critical-warning">⚠️ SANTÉ CRITIQUE</div>}
-
-      <div className="floating-texts">
+      {/* <div className="floating-texts">
         {floatingTexts.map((text) => (
           <div
             key={text.id}
@@ -140,26 +138,13 @@ export function HealthBar({ healthManager }) {
             {Math.abs(text.value)}
           </div>
         ))}
-      </div>
+      </div> */}
 
-      <style>{`
-        .health-bar-container {
-          position: absolute;
-          top: 100px;
-          left: 20px;
-          width: 600px;
-          z-index: 100;
-          font-family: 'Arial', sans-serif;
-        }
-        .health-bar-wrapper {
-          position: relative;
-          border-radius: 8px;
-          overflow: hidden;
-          background: rgba(0,0,0,0.5);
-          padding: 8px;
-          box-shadow: 0 0 20px rgba(0,0,0,0.7);
-          transition: box-shadow 0.2s;
-        }
+      {/* <style>{`
+ 
+
+      
+
         .health-bar-wrapper.damage-flash {
           animation: damageFlash 0.2s ease-out;
         }
@@ -253,7 +238,7 @@ export function HealthBar({ healthManager }) {
           0% { opacity: 1; transform: translateX(var(--x-offset)) translateY(0); }
           100% { opacity: 0; transform: translateX(var(--x-offset)) translateY(-40px); }
         }
-      `}</style>
+      `}</style> */}
     </div>
   );
 }

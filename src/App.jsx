@@ -528,30 +528,32 @@ const App = () => {
 
   return (
     <main className="relative w-full h-screen">
-      {/* ✅ healthManagerRef.current passé comme prop */}
-      <HealthBar healthManager={healthManagerRef.current} />
+      <div className="button-healthbar z-100 absolute left-6 right-6 flex-row gap-30">
+        <HealthBar healthManager={healthManagerRef.current} />
+
+        <ButtonAddItem
+          scene={sceneRef.current}
+          world={worldRef.current}
+          camera={cameraRef.current}
+          renderer={rendererRef.current}
+          spawnedItems={spawnedItemsRef}
+          characterBody={characterBodyRef.current}
+          healthManager={healthManagerRef.current}
+          getViewBounds={() => {
+            const camera = cameraRef.current;
+            const mesh = meshRef.current;
+            if (!camera || !mesh) return { halfW: 5, halfH: 5 };
+            const distance = camera.position.z - mesh.position.z;
+            const vFov = THREE.MathUtils.degToRad(camera.fov);
+            const viewHeight = 2 * Math.tan(vFov / 2) * distance;
+            const viewWidth = viewHeight * camera.aspect;
+            return { halfW: viewWidth / 2, halfH: viewHeight / 2 };
+          }}
+        />
+      </div>
       <p className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
         Click on "space" or "esc" to open the menu.
       </p>
-      <ButtonAddItem
-        scene={sceneRef.current}
-        world={worldRef.current}
-        camera={cameraRef.current}
-        renderer={rendererRef.current}
-        spawnedItems={spawnedItemsRef}
-        characterBody={characterBodyRef.current}
-        healthManager={healthManagerRef.current}
-        getViewBounds={() => {
-          const camera = cameraRef.current;
-          const mesh = meshRef.current;
-          if (!camera || !mesh) return { halfW: 5, halfH: 5 };
-          const distance = camera.position.z - mesh.position.z;
-          const vFov = THREE.MathUtils.degToRad(camera.fov);
-          const viewHeight = 2 * Math.tan(vFov / 2) * distance;
-          const viewWidth = viewHeight * camera.aspect;
-          return { halfW: viewWidth / 2, halfH: viewHeight / 2 };
-        }}
-      />
       {ready && (
         <Trash
           scene={sceneRef.current}
