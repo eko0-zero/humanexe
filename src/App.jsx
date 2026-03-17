@@ -369,6 +369,7 @@ const App = () => {
     };
 
     const onMouseDown = (e) => {
+      if (isIntroRef.current) return;
       const { clientX, clientY } = getClientPos(e);
       if (!isOverModel(clientX, clientY)) return;
       isDraggingRef.current = true;
@@ -499,7 +500,8 @@ const App = () => {
         characterBody.position.y = minY;
         characterBody.velocity.y = 0;
       }
-
+      characterBody.position.z = 0;
+      characterBody.velocity.z = 0;
       const activeMesh = meshRef.current;
       if (activeMesh) {
         activeMesh.position.set(
