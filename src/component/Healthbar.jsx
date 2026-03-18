@@ -134,9 +134,9 @@ export function HealthBar({ healthManager }) {
       <div
         className={`health-bar-wrapper ${showDamageEffect ? "damage-flash" : ""}`}
       >
-        <div className="health-text">
+        <div className="health-tex ">
           <span
-            className={`health-percentage ont-host font-regular text-[1.4rem] left-5 m-1/2 -translate-x-1/2 ${isCritical ? "critical" : isLowHealth ? "low-health" : ""}`}
+            className={`health-percentage font-host font-regular text-[1.4rem] m-[calc(50%-1.4rem)] ${isCritical ? "critical" : isLowHealth ? "low-health" : ""}`}
             style={{
               width: `${healthPercentage}%`,
               transition: "0.3s ease-out",
@@ -152,7 +152,7 @@ export function HealthBar({ healthManager }) {
             <AnimatedNumber value={Math.ceil(displayPercentage)} suffix="%" />
           </span>
         </div>
-        <div className="health-bar-background bg-linear-to-r from-[#D9D9D9] to-[#CECECE] h-4.5 rounded-[100px]">
+        <div className="health-bar-background overflow-hidden bg-linear-to-r from-[#D9D9D9] to-[#CECECE] h-4.5 rounded-[100px]">
           <div
             className={`health-bar-fill h-4.5 rounded-[100px] ${isCritical ? "critical" : isLowHealth ? "low-health" : ""}`}
             style={{

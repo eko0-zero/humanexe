@@ -598,17 +598,26 @@ const App = () => {
           getViewBounds={() => {
             const camera = cameraRef.current;
             const mesh = meshRef.current;
-            if (!camera || !mesh) return { halfW: 5, halfH: 5 };
+
+            if (!camera || !mesh) {
+              return { halfW: 5, halfH: 5 };
+            }
+
             const distance = camera.position.z - mesh.position.z;
             const vFov = THREE.MathUtils.degToRad(camera.fov);
+
             const viewHeight = 2 * Math.tan(vFov / 2) * distance;
             const viewWidth = viewHeight * camera.aspect;
-            return { halfW: viewWidth / 2, halfH: viewHeight / 2 };
+
+            return {
+              halfW: viewWidth / 2,
+              halfH: viewHeight / 2,
+            };
           }}
         />
       </div>
 
-      <p className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
+      <p className="absolute bottom-5 left-6 font-host italic font-light text-[1.1rem] text-grey z-10">
         Click on "space" or "esc" to open the menu.
       </p>
 
@@ -652,12 +661,17 @@ const App = () => {
         />
       )}
 
-      {/* Statistics — position fixed z-[9999], fade géré dans Statistics.jsx */}
-      {showStats && <Statistics healthManager={healthManagerRef.current} />}
+      {/* ✅ Correction ici */}
+      {showStats && <Statistics spawnedItems={spawnedItemsRef.current} />}
 
       <canvas
         ref={canvasRef}
-        style={{ display: "block", position: "absolute", top: 0, left: 0 }}
+        style={{
+          display: "block",
+          position: "absolute",
+          top: 0,
+          left: 0,
+        }}
       />
     </main>
   );
