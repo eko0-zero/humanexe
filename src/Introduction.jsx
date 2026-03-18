@@ -1,9 +1,28 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import arrow from "./assets/img/svg/arrow.svg";
 
-export default function Introduction() {
+export default function Introduction({ onEnter }) {
+  useEffect(() => {
+    const handleScroll = (e) => {
+      if (e.deltaY > 0) onEnter();
+    };
+    const handleKey = (e) => {
+      if (e.key === "ArrowDown" || e.key === " ") onEnter();
+    };
+
+    window.addEventListener("wheel", handleScroll);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("wheel", handleScroll);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [onEnter]);
+
   return (
-    <main className="relative h-[100vh] w-[100vw] flex">
+    <main
+      className="relative h-[100vh] w-[100vw] flex cursor-pointer"
+      onClick={onEnter}
+    >
       <div className="title-box flex items-center justify-between w-full px-[5%] max-[1000px]:flex-col max-[1000px]:justify-center max-[1000px]:items-baseline max-[1000px]:gap-[2vh]">
         <h1 className="title font-host font-regular text-[6rem] max-[1100px]:text-[5.2rem] min-[2500px]:text-[7rem] text-black">
           Human.exe
