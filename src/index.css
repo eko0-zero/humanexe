@@ -26,3 +26,9 @@
   --font-host: "Host Grotesk", sans-serif;
   --text-grey: #383838;
 }
+
+@media (max-height: 700px) {
+  .custom-gap {
+    gap: 5vh;
+  }
+}

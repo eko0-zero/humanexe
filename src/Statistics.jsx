@@ -136,46 +136,51 @@ export default function Statistics({ spawnedItems, givenItems }) {
       ref={ref}
       className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/45 pointer-events-auto w-screen h-screen"
     >
-      <div className="w-[95vw] h-screen relative">
-        <h2 className="font-host font-regular text-[3.8rem] my-[3vh]">
+      <div className="custom-gap w-[95vw] h-screen relative flex flex-col gap-[10vh]">
+        <h2
+          className="font-host font-regular text-[3.8rem]
+       mt-[4vh] -mb-[4vh]"
+        >
           statistics
         </h2>
-        <p className="font-host font-light italic text-[2.5rem]">
+        <p className="font-host font-light italic text-[2.5rem] -mb-[3vh] ">
           number of items given
         </p>
-        <p className="font-host font-light italic text-[2.2rem] my-[2.6vh]">
-          total <br /> {total}
-        </p>
+        <div className="flex gap-[10%]">
+          <p className="font-host font-light italic text-[2.2rem]">
+            total <br /> {total}
+          </p>
 
-        <div className="flex flex-col gap-12">
-          {categories.map((cat, i) => (
-            <div
-              key={cat.key}
-              className="grid grid-cols-[80px_1fr_100px] items-center gap-4"
-            >
-              <span
-                className="font-bold text-[1.4rem] text-right"
-                style={{ color: cat.color }}
+          <div className="flex flex-col gap-[8vh] w-[100%]">
+            {categories.map((cat, i) => (
+              <div
+                key={cat.key}
+                className="grid grid-cols-[80px_1fr_100px] items-center gap-4 "
               >
-                {cat.pct}%
-              </span>
-              <div className="h-4 bg-gray-300 rounded-full overflow-hidden">
-                <div
-                  ref={(el) => {
-                    if (el) barsRef.current[i] = el;
-                  }}
-                  className="h-full w-0 rounded-full"
-                  style={{ backgroundColor: cat.color }}
-                />
+                <span
+                  className="font-bold text-[1.4rem] text-right"
+                  style={{ color: cat.color }}
+                >
+                  {cat.pct}%
+                </span>
+                <div className="h-4 bg-gray-300 rounded-full overflow-hidden">
+                  <div
+                    ref={(el) => {
+                      if (el) barsRef.current[i] = el;
+                    }}
+                    className="h-full w-0 rounded-full"
+                    style={{ backgroundColor: cat.color }}
+                  />
+                </div>
+                <span
+                  className="italic text-[1.2rem]"
+                  style={{ color: cat.color }}
+                >
+                  {cat.label}
+                </span>
               </div>
-              <span
-                className="italic text-[1.2rem]"
-                style={{ color: cat.color }}
-              >
-                {cat.label}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="flex justify-end mt-10">
