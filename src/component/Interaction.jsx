@@ -26,15 +26,16 @@ const PHASE_LOOP = "loop";
 const PHASE_REACT = "react";
 
 // ── Hitbox du personnage — ajuste ces 4 valeurs ──
-const HITBOX_X = 0.8;        // largeur   (gauche / droite)
-const HITBOX_Y = 1.6;        // hauteur   (bas / haut)
-const HITBOX_Z = 0.5;        // profondeur (avant / arrière)
+const HITBOX_X = 0.8; // largeur   (gauche / droite)
+const HITBOX_Y = 1.6; // hauteur   (bas / haut)
+const HITBOX_Z = 0.5; // profondeur (avant / arrière)
 const HITBOX_Y_OFFSET = 0.5; // décale le centre vers le haut du modèle
 
 const Interaction = ({
   mixerRef,
   rawClips,
   spawnedItems,
+  givenItems,
   characterBody,
   isIntroRef,
   isDraggingRef,
@@ -121,7 +122,7 @@ const Interaction = ({
       if (!actions.length) return;
 
       const mainAction = actions.find(
-        (a) => a.getClip().name === LOOP_CLIP_NAME
+        (a) => a.getClip().name === LOOP_CLIP_NAME,
       );
       if (!mainAction) return;
 
@@ -145,6 +146,17 @@ const Interaction = ({
         if (!charBody || !items?.length) return;
         if (isDraggingRef?.current) return;
 
+        const pushGivenItem = (item) => {
+          if (!givenItems) return;
+          if (Array.isArray(givenItems)) {
+            givenItems.push(item);
+            return;
+          }
+          if (givenItems.current && Array.isArray(givenItems.current)) {
+            givenItems.current.push(item);
+          }
+        };
+
         for (const item of [...items]) {
           if (!item?.body || item.consumed) continue;
 
@@ -152,12 +164,15 @@ const Interaction = ({
           if (!anim) continue;
 
           const dx = Math.abs(charBody.position.x - item.body.position.x);
-          const dy = Math.abs((charBody.position.y + HITBOX_Y_OFFSET) - item.body.position.y);
+          const dy = Math.abs(
+            charBody.position.y + HITBOX_Y_OFFSET - item.body.position.y,
+          );
           const dz = Math.abs(charBody.position.z - item.body.position.z);
 
           if (dx > HITBOX_X || dy > HITBOX_Y || dz > HITBOX_Z) continue;
 
           item.consumed = true;
+          pushGivenItem(item);
 
           if (world?.current) {
             world.current.removeBody(item.body);

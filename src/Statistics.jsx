@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import arrowr from "./assets/img/svg/arrow-right.svg";
 
-export default function Statistics({ spawnedItems }) {
+export default function Statistics({ spawnedItems, givenItems }) {
   const ref = useRef(null);
   const barsRef = useRef({});
 
@@ -13,32 +13,14 @@ export default function Statistics({ spawnedItems }) {
     knife: 0,
   });
 
-  // 🔍 LOG 1: Vérifier que le composant est monté
   useEffect(() => {
-    console.log("📊 Statistics composant MONTÉ");
-    return () => console.log("📊 Statistics composant DÉMONTÉ");
-  }, []);
-
-  // 🔍 LOG 2: Vérifier les props reçues
-  useEffect(() => {
-    console.log("📊 spawnedItems reçu:", spawnedItems);
-    console.log("📊 spawnedItems.current:", spawnedItems?.current);
-    console.log("📊 Type:", typeof spawnedItems);
-    console.log("📊 Est un array?", Array.isArray(spawnedItems));
-    console.log(
-      "📊 Est un array.current?",
-      Array.isArray(spawnedItems?.current),
-    );
-  }, [spawnedItems]);
-
-  useEffect(() => {
-    // Normaliser les données reçues (array direct ou ref React)
+    const sourceItems = givenItems ?? spawnedItems;
     let itemsArray = [];
 
-    if (Array.isArray(spawnedItems)) {
-      itemsArray = spawnedItems;
-    } else if (spawnedItems && Array.isArray(spawnedItems.current)) {
-      itemsArray = spawnedItems.current;
+    if (Array.isArray(sourceItems)) {
+      itemsArray = sourceItems;
+    } else if (sourceItems && Array.isArray(sourceItems.current)) {
+      itemsArray = sourceItems.current;
     }
 
     let validItems = itemsArray.filter(
@@ -56,7 +38,6 @@ export default function Statistics({ spawnedItems }) {
             item.interactionCount > 0)),
     );
 
-    // Si aucun item n'a de flag d'animation, fallback : compter les items non supprimés
     if (validItems.length === 0) {
       validItems = itemsArray.filter(
         (item) => item && item.modelName && !item.deleted,
@@ -87,10 +68,15 @@ export default function Statistics({ spawnedItems }) {
     });
 
     setCounts(newCounts);
-  }, [spawnedItems]);
+  }, [
+    typeof spawnedItems?.length === "number" ? spawnedItems.length : undefined,
+    typeof givenItems?.length === "number" ? givenItems.length : undefined,
+    typeof givenItems?.current?.length === "number"
+      ? givenItems.current.length
+      : undefined,
+  ]);
 
   const total = counts.waffle + counts.plushie + counts.bat + counts.knife;
-  console.log("📊 Total calculé:", total);
 
   const categories = [
     {
@@ -148,87 +134,52 @@ export default function Statistics({ spawnedItems }) {
   return (
     <div
       ref={ref}
-      className="fixed z-300 flex items-center justify-center font-host opacity-[0] backdrop-blur-[6px] bg-[rgba(255,255,255,0.45)] pointer-events-all w-[100vw] h-[100vh]"
+      className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/45 pointer-events-auto w-screen h-screen"
     >
-      <div className="w-[95vw] h-[100vh] relative">
+      <div className="w-[95vw] h-screen relative">
         <h2 className="font-host font-regular text-[3.8rem] my-[3vh]">
           statistics
         </h2>
         <p className="font-host font-light italic text-[2.5rem]">
           number of items given
         </p>
-        <p
-          style={{
-            fontStyle: "italic",
-            fontSize: "1.2rem",
-            margin: "0 0 1.5rem",
-          }}
-        >
-          total <strong>{total}</strong>
+        <p className="font-host font-light italic text-[2.2rem] my-[2.6vh]">
+          total <br /> {total}
         </p>
-        <div
-          style={{ display: "flex", flexDirection: "column", gap: "1.6rem" }}
-        >
+
+        <div className="flex flex-col gap-12">
           {categories.map((cat, i) => (
             <div
               key={cat.key}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "80px 1fr 100px",
-                alignItems: "center",
-                gap: "1rem",
-              }}
+              className="grid grid-cols-[80px_1fr_100px] items-center gap-4"
             >
               <span
-                style={{
-                  color: cat.color,
-                  fontSize: "1.4rem",
-                  fontWeight: 700,
-                  textAlign: "right",
-                }}
+                className="font-bold text-[1.4rem] text-right"
+                style={{ color: cat.color }}
               >
                 {cat.pct}%
               </span>
-              <div
-                style={{
-                  height: "18px",
-                  backgroundColor: "#d1d5db",
-                  borderRadius: "999px",
-                  overflow: "hidden",
-                }}
-              >
+              <div className="h-4 bg-gray-300 rounded-full overflow-hidden">
                 <div
                   ref={(el) => {
                     if (el) barsRef.current[i] = el;
                   }}
-                  style={{
-                    height: "100%",
-                    width: "0%",
-                    backgroundColor: cat.color,
-                    borderRadius: "999px",
-                  }}
+                  className="h-full w-0 rounded-full"
+                  style={{ backgroundColor: cat.color }}
                 />
               </div>
               <span
-                style={{
-                  color: cat.color,
-                  fontStyle: "italic",
-                  fontSize: "1.2rem",
-                }}
+                className="italic text-[1.2rem]"
+                style={{ color: cat.color }}
               >
                 {cat.label}
               </span>
             </div>
           ))}
         </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginTop: "2.5rem",
-          }}
-        >
-          <button className="absolute bottom-15 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-[100px] flex items-center gap-3 font-host font-light text-[1.8rem]">
+
+        <div className="flex justify-end mt-10">
+          <button className="absolute bottom-15 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center gap-3 font-host font-light text-[1.8rem]">
             <img src={arrowr} alt="arrow right" />
             <span>explanation</span>
           </button>

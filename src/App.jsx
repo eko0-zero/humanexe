@@ -102,14 +102,8 @@ function loadModel(scene, placeholderCube) {
           }
         });
 
-        console.log(
-          "Meshes trouvés :",
-          allMeshesInModel.map((m) => m.name),
-        );
-
         const eyeMesh =
           allMeshesInModel.find((m) => m.name === "model001_4") ?? null;
-        console.log("eyeMesh sélectionné :", eyeMesh?.name ?? "aucun");
 
         model.traverse((node) => {
           if (node.isMesh) {
@@ -182,6 +176,7 @@ const App = () => {
   const rendererRef = useRef(null);
   const worldRef = useRef(null);
   const spawnedItemsRef = useRef([]);
+  const givenItemsRef = useRef([]);
   const skeletonRef = useRef(null);
   const mixerRef = useRef(null);
   const rawClipsRef = useRef([]);
@@ -286,7 +281,6 @@ const App = () => {
       }
 
       if (eyeMesh) {
-        console.log("✅ eyeMesh trouvé, chargement des textures...");
         const eyeMat = new THREE.MeshBasicMaterial({
           transparent: true,
           alphaTest: 0,
@@ -305,8 +299,6 @@ const App = () => {
           texLoader.load(
             path,
             (tex) => {
-              if (i === EYE_START_FRAME)
-                console.log("✅ première texture chargée :", path);
               tex.colorSpace = THREE.SRGBColorSpace;
               tex.flipY = false;
               eyeTexturesRef.current[i] = tex;
@@ -647,6 +639,7 @@ const App = () => {
           mixerRef={mixerRef}
           rawClips={rawClipsRef.current}
           spawnedItems={spawnedItemsRef}
+          givenItems={givenItemsRef}
           characterBody={characterBodyRef}
           isIntroRef={isIntroRef}
           isDraggingRef={isDraggingRef}
@@ -661,8 +654,12 @@ const App = () => {
         />
       )}
 
-      {/* ✅ Correction ici */}
-      {showStats && <Statistics spawnedItems={spawnedItemsRef.current} />}
+      {showStats && (
+        <Statistics
+          spawnedItems={spawnedItemsRef.current}
+          givenItems={givenItemsRef}
+        />
+      )}
 
       <canvas
         ref={canvasRef}
