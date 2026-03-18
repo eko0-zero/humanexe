@@ -1,8 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import arrow from "./assets/img/svg/arrow.svg";
+import gsap from "gsap";
 
 export default function Introduction({ onEnter }) {
+  const arrowRef = useRef(null);
   useEffect(() => {
+    gsap.to(arrowRef.current, {
+      y: 10,
+      duration: 0.6,
+      repeat: -1,
+      yoyo: true,
+      ease: "power2.inOut",
+    });
+
     const handleScroll = (e) => {
       if (e.deltaY > 0) onEnter();
     };
@@ -24,7 +34,7 @@ export default function Introduction({ onEnter }) {
       onClick={onEnter}
     >
       <div className="title-box flex items-center justify-between w-full px-[5%] max-[1000px]:flex-col max-[1000px]:justify-center max-[1000px]:items-baseline max-[1000px]:gap-[2vh]">
-        <h1 className="title font-host font-regular text-[6rem] max-[1100px]:text-[5.2rem] min-[2500px]:text-[7rem] text-black">
+        <h1 className="title font-host font-regular text-[6rem] max-[1100px]:text-[5.2rem] min-[1900px]:text-[10rem] text-black">
           Human.exe
         </h1>
         <p className="context font-host font-light italic text-[1.3rem] max-[1100px]:text-[1rem] max-[1000px]:w-[65vw] min-[2500px]:text-[1.6rem] text-black w-[45vw]">
@@ -38,7 +48,12 @@ export default function Introduction({ onEnter }) {
         <p className="scroll-or-click font-host font-light italic text-[1.8rem] max-[1000px]:text-[1.2rem] text-black text-center">
           scroll or click
         </p>
-        <img className="max-[1000px]:h-[8px]" src={arrow} alt="arrow" />
+        <img
+          ref={arrowRef}
+          className="max-[1000px]:h-[8px]"
+          src={arrow}
+          alt="arrow"
+        />
       </div>
     </main>
   );
