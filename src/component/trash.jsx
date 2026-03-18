@@ -14,6 +14,7 @@ export default function Trash({
   spawnedItems,
   world,
   renderer,
+  isLocked,
 }) {
   const trashRef = useRef(null);
   const trashBoundsRef = useRef({
@@ -49,7 +50,6 @@ export default function Trash({
           if (node.isMesh) {
             node.castShadow = true;
             node.receiveShadow = true;
-
             if (node.material) {
               node.material = node.material.clone();
             }
@@ -95,15 +95,12 @@ export default function Trash({
       trashRef.current.position.z = TRASH_Z_POSITION;
 
       const targetScale = isHoveredRef.current ? HOVER_SCALE : BASE_SCALE;
-
       const smoothScale = THREE.MathUtils.lerp(
         trashRef.current.scale.x,
         targetScale,
         0.1,
       );
-
       trashRef.current.scale.setScalar(smoothScale);
-
       trashBoundsRef.current.position.copy(trashRef.current.position);
     };
 
@@ -121,27 +118,22 @@ export default function Trash({
 
       const trashPos = trashRef.current.position;
       const trashSize = trashBoundsRef.current.size;
-
       const trashRadius = Math.max(trashSize.x, trashSize.y, trashSize.z) / 2;
 
       for (let i = spawnedItems.current.length - 1; i >= 0; i--) {
         const item = spawnedItems.current[i];
-
         if (!item.body) continue;
 
         const itemPos = item.body.position;
-
         const distance = trashPos.distanceTo(itemPos);
 
         if (distance < trashRadius + 0.15) {
           if (item.mesh && item.mesh.parent) {
             item.mesh.parent.remove(item.mesh);
           }
-
           if (item.body && world) {
             world.removeBody(item.body);
           }
-
           spawnedItems.current.splice(i, 1);
         }
       }
@@ -159,30 +151,24 @@ export default function Trash({
     if (!renderer || !camera) return;
 
     const onMouseMove = (e) => {
+      if (isLocked?.current) return;
       if (!trashRef.current) return;
 
       const rect = renderer.domElement.getBoundingClientRect();
-
       mouseRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-
       mouseRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycasterRef.current.setFromCamera(mouseRef.current, camera);
-
       const intersects = raycasterRef.current.intersectObject(
         trashRef.current,
         true,
       );
-
       isHoveredRef.current = intersects.length > 0;
     };
 
     window.addEventListener("mousemove", onMouseMove);
-
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-    };
-  }, [renderer, camera]);
+    return () => window.removeEventListener("mousemove", onMouseMove);
+  }, [renderer, camera, isLocked]);
 
   // =========================
   // Click pour supprimer
@@ -191,10 +177,10 @@ export default function Trash({
     if (!renderer || !camera) return;
 
     const onClick = () => {
+      if (isLocked?.current) return;
       if (!trashRef.current) return;
 
       raycasterRef.current.setFromCamera(mouseRef.current, camera);
-
       const intersects = raycasterRef.current.intersectObject(
         trashRef.current,
         true,
@@ -205,22 +191,17 @@ export default function Trash({
           if (item.mesh && item.mesh.parent) {
             item.mesh.parent.remove(item.mesh);
           }
-
           if (item.body && world) {
             world.removeBody(item.body);
           }
         });
-
         spawnedItems.current = [];
       }
     };
 
     window.addEventListener("click", onClick);
-
-    return () => {
-      window.removeEventListener("click", onClick);
-    };
-  }, [renderer, camera, spawnedItems, world]);
+    return () => window.removeEventListener("click", onClick);
+  }, [renderer, camera, spawnedItems, world, isLocked]);
 
   return null;
 }

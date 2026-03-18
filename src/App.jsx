@@ -39,6 +39,7 @@ function createRenderer(canvas, width, height) {
   renderer.setClearColor(0xffffff);
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
+  // Fix Firefox : SRGBColorSpace peut faire disparaître les meshes sur Firefox
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.LinearToneMapping;
   renderer.toneMappingExposure = 1;
