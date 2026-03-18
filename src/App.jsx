@@ -8,6 +8,7 @@ import ButtonAddItem from "./component/ButtonAddItems.jsx";
 import Skeleton from "./component/Skeleton.jsx";
 import Interaction from "./component/Interaction.jsx";
 import { HealthManager, HealthBar } from "./component/Healthbar.jsx";
+import Statistics from "./Statistics.jsx";
 
 const MODEL_PATH = "./3D/models/character.glb";
 const GROUND_Y = -1;
@@ -105,7 +106,6 @@ function loadModel(scene, placeholderCube) {
           allMeshesInModel.map((m) => m.name),
         );
 
-        // model001_7 = candidat yeux — à ajuster si besoin
         const eyeMesh =
           allMeshesInModel.find((m) => m.name === "model001_4") ?? null;
         console.log("eyeMesh sélectionné :", eyeMesh?.name ?? "aucun");
@@ -191,7 +191,6 @@ const App = () => {
   const eyeFrameRef = useRef(EYE_START_FRAME);
   const eyeTimeAccRef = useRef(0);
 
-  // Plage dynamique des yeux — modifiée par Interaction via onEyeRangeChange
   const eyeStartRef = useRef(EYE_START_FRAME);
   const eyeEndRef = useRef(EYE_END_FRAME);
 
@@ -203,9 +202,32 @@ const App = () => {
 
   const healthManagerRef = useRef(new HealthManager(200));
 
+  // Ref partagée avec Trash et ButtonAddItem pour bloquer toutes les interactions
+  const showStatsRef = useRef(false);
+
   const [ready, setReady] = useState(false);
   const [model, setModel] = useState(null);
+  const [showStats, setShowStats] = useState(false);
 
+  // ─── Écoute santé ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const hm = healthManagerRef.current;
+
+    const handleHealthChange = (data) => {
+      // Si Statistics est déjà affiché, on gèle tout changement de vie
+      if (showStatsRef.current) return;
+
+      const isEdge =
+        data.currentHealth === 0 || data.currentHealth === hm.maxHealth;
+      showStatsRef.current = isEdge;
+      setShowStats(isEdge);
+    };
+
+    hm.onHealthChange(handleHealthChange);
+    return () => hm.offHealthChange(handleHealthChange);
+  }, []);
+
+  // ─── Setup Three.js ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -302,7 +324,6 @@ const App = () => {
             },
           );
         };
-        // Charge toutes les frames (0 → 748) pour couvrir toutes les plages
         loadNext(0);
       } else {
         console.warn(
@@ -369,6 +390,7 @@ const App = () => {
     };
 
     const onMouseDown = (e) => {
+      if (showStatsRef.current) return;
       if (isIntroRef.current) return;
       const { clientX, clientY } = getClientPos(e);
       if (!isOverModel(clientX, clientY)) return;
@@ -400,6 +422,7 @@ const App = () => {
     };
 
     const onMouseMove = (e) => {
+      if (showStatsRef.current) return;
       if (!isDraggingRef.current) return;
       const { clientX, clientY } = getClientPos(e);
       const planeOrigin = new THREE.Vector3(
@@ -424,6 +447,7 @@ const App = () => {
     };
 
     const onMouseUp = () => {
+      if (showStatsRef.current) return;
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
       characterBody.mass = 1;
@@ -467,7 +491,6 @@ const App = () => {
           const end = eyeEndRef.current;
 
           let next = eyeFrameRef.current + 1;
-          // Reset si hors de la plage courante
           if (next < start || next > end) next = start;
 
           const rangeSize = end - start + 1;
@@ -570,6 +593,7 @@ const App = () => {
           spawnedItems={spawnedItemsRef}
           characterBody={characterBodyRef.current}
           healthManager={healthManagerRef.current}
+          isLocked={showStatsRef}
           getViewBounds={() => {
             const camera = cameraRef.current;
             const mesh = meshRef.current;
@@ -582,9 +606,11 @@ const App = () => {
           }}
         />
       </div>
+
       <p className="absolute bottom-5 left-5 font-host italic font-light text-[1.1rem] text-grey z-10">
         Click on "space" or "esc" to open the menu.
       </p>
+
       {ready && (
         <Trash
           scene={sceneRef.current}
@@ -593,8 +619,10 @@ const App = () => {
           world={worldRef.current}
           renderer={rendererRef.current}
           healthManager={healthManagerRef.current}
+          isLocked={showStatsRef}
         />
       )}
+
       {model && (
         <Skeleton
           ref={skeletonRef}
@@ -603,6 +631,7 @@ const App = () => {
           characterBody={characterBodyRef.current}
         />
       )}
+
       {model && (
         <Interaction
           mixerRef={mixerRef}
@@ -610,7 +639,7 @@ const App = () => {
           spawnedItems={spawnedItemsRef}
           characterBody={characterBodyRef}
           isIntroRef={isIntroRef}
-          isDraggingRef={isDraggingRef}  
+          isDraggingRef={isDraggingRef}
           skeletonRef={skeletonRef}
           healthManager={healthManagerRef.current}
           world={worldRef}
@@ -618,12 +647,13 @@ const App = () => {
             eyeStartRef.current = start;
             eyeEndRef.current = end;
             eyeFrameRef.current = start;
-           
           }}
-
-          
         />
       )}
+
+      {/* Statistics — position fixed z-[9999], fade géré dans Statistics.jsx */}
+      {showStats && <Statistics healthManager={healthManagerRef.current} />}
+
       <canvas
         ref={canvasRef}
         style={{ display: "block", position: "absolute", top: 0, left: 0 }}
