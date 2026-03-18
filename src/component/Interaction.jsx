@@ -26,7 +26,7 @@ const PHASE_LOOP = "loop";
 const PHASE_REACT = "react";
 
 // ── Hitbox du personnage — ajuste ces 4 valeurs ──
-const HITBOX_X = 0.6;        // largeur   (gauche / droite)
+const HITBOX_X = 0.8;        // largeur   (gauche / droite)
 const HITBOX_Y = 1.6;        // hauteur   (bas / haut)
 const HITBOX_Z = 0.5;        // profondeur (avant / arrière)
 const HITBOX_Y_OFFSET = 0.5; // décale le centre vers le haut du modèle
@@ -167,6 +167,10 @@ const Interaction = ({
           if (idx !== -1) spawnedItems.current.splice(idx, 1);
 
           item.mesh.visible = false;
+
+          item.mesh.parent?.remove(item.mesh);
+          item.mesh.geometry?.dispose();
+          item.mesh.material?.dispose();
 
           item.body.collisionFilterGroup = 0;
           item.body.collisionFilterMask = 0;

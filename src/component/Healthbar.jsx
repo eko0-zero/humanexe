@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { gsap } from "gsap";
 
 export class HealthManager {
   constructor(maxHealth = 200) {
@@ -34,9 +35,7 @@ export class HealthManager {
       isHealing: healthValue > 0,
     };
     this.healthChangeCallbacks.forEach((cb) => cb(data));
-    console.log(
-      `❤️ Santé: ${previousHealth} → ${this.currentHealth} (${healthValue > 0 ? "+" : ""}${healthValue})`,
-    );
+
   }
 
   getHealthPercentage() {
@@ -54,6 +53,32 @@ export class HealthManager {
   takeDamage(amount) {
     this.applyItemEffect({ health: -amount, name: "Damage" });
   }
+}
+function AnimatedNumber({ value, duration = 5, suffix = "" }) {
+  const [display, setDisplay] = useState(value);
+  const obj = useRef({ val: value});
+  const isFirstRender = useRef(true); 
+
+  useEffect(() => {
+    const tween = gsap.to(obj.current, {
+      val: value,
+      duration,
+      ease: "power2.out",
+      onUpdate: () => {
+        if (value % 1 !== 0) setDisplay(obj.current.val.toFixed(1));
+        else setDisplay(Math.floor(obj.current.val));
+      },
+    });
+
+    return () => tween.kill(); // cleanup
+  }, [value]);
+
+  return (
+    <span>
+      {display}
+      {suffix}
+    </span>
+  );
 }
 
 export function HealthBar({ healthManager }) {
@@ -125,7 +150,7 @@ export function HealthBar({ healthManager }) {
                     : "#108420",
             }}
           >
-            {Math.ceil(displayPercentage)}%
+            <AnimatedNumber value={Math.ceil(displayPercentage)} suffix="%" />
           </span>
         </div>
         <div className="health-bar-background bg-linear-to-r from-[#D9D9D9] to-[#CECECE] h-4.5 rounded-[100px]">
