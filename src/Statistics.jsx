@@ -178,7 +178,8 @@ export default function Statistics({
 
         <div className="flex justify-end mt-10">
           <button
-            onClick={() => onNavigate && onNavigate("intro")}
+            // onClick={() => onNavigate && onNavigate("intro")}
+            onClick={() => onNavigate("intro")}
             className="absolute bottom-10 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center justify-center gap-3 font-host font-light text-big-base"
           >
             <img src={arrowr} alt="arrow right" />

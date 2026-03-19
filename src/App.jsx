@@ -706,6 +706,7 @@ const App = ({ onNavigate }) => {
         <Statistics
           spawnedItems={spawnedItemsRef.current}
           givenItems={givenItemsRef}
+          onNavigate={onNavigate}
         />
       )}
 
