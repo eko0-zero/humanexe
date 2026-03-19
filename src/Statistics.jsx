@@ -202,7 +202,10 @@ export default function Statistics({ spawnedItems, givenItems }) {
           </div>
 
           <div className="flex justify-end item-center mt-10">
-            <button className="absolute bottom-10 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center justify-center gap-3 font-host font-light text-big-base">
+            <button
+              href="/explanation"
+              className="absolute bottom-10 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center justify-center gap-3 font-host font-light text-big-base"
+            >
               <img src={arrowr} alt="arrow right" />
               <span>explanation</span>
             </button>

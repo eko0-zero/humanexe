@@ -16,7 +16,7 @@ const Menu = ({ open }) => {
       </a>
 
       <a
-        href="/explanation"
+        href="/Explanation"
         className="ffont-host relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-black after:transition-all after:duration-300 hover:after:w-full hover:italic"
       >
         explanation

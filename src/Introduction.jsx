@@ -143,10 +143,8 @@ export default function Introduction({ onEnter }) {
           ref={contextRef}
           className="context font-host font-light italic text-base max-[1100px]:text-[1rem] max-[1000px]:w-[65vw] min-[2500px]:text-[1.6rem] text-black w-[45vw] opacity-0 translate-y-10"
         >
-          text intro Lorem ipsum dolor sit amet, consectetur adipiscing elit,
-          sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut
-          enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi
-          ut aliquip ex ea commodo consequat.
+          The following page is a 3D simulation that you can explore and
+          interact with. Feel free to experiment and try out different actions.
         </p>
       </div>
       <div
