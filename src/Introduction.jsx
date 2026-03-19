@@ -37,11 +37,12 @@ export default function Introduction({ onEnter }) {
 
   useEffect(() => {
     // Précharger les images
-    const imagesToPreload = [arrow]; // ajoute ici d'autres images si nécessaire
-    imagesToPreload.forEach((src) => {
-      const img = new Image();
-      img.src = src;
-    });
+    const imagesToPreload = [arrow];
+    ("./3D/textures/eyes/eyes_${padded}.webp",
+      imagesToPreload.forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      }));
 
     // Précharger les modèles 3D avec async/await et gestion d'erreur robuste
     (async () => {
