@@ -623,7 +623,7 @@ const App = ({ onNavigate }) => {
         className={`absolute inset-0 bg-white z-[1000] pointer-events-none transition-opacity duration-800 ease-out ${ready ? "opacity-0" : "opacity-100"}`}
       />
 
-      <div className="button-healthbar z-100 absolute left-6 right-6 flex-row gap-30">
+      <div className="button-healthbar z-100 absolute left-15 right-15 flex-row gap-30">
         <HealthBar healthManager={healthManagerRef.current} />
 
         <ButtonAddItem
@@ -657,7 +657,7 @@ const App = ({ onNavigate }) => {
         />
       </div>
 
-      <p className="small-text absolute bottom-5 left-6 font-host italic font-light text-[1.5rem] text-grey z-10">
+      <p className="small-text absolute bottom-5 left-15 font-host italic font-light text-[1.5rem] text-grey z-10">
         Click on "space" or "esc" to open the menu.
       </p>
 

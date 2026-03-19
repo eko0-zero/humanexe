@@ -131,9 +131,9 @@ export default function Statistics({
   return (
     <div
       ref={ref}
-      className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/90 pointer-events-auto w-screen h-screen"
+      className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/90 pointer-events-auto w-screen h-screen "
     >
-      <div className="custom-gap w-[95vw] h-screen relative flex flex-col gap-[10vh]">
+      <div className="custom-gap w-[90vw] h-screen relative flex flex-col gap-[10vh]">
         <h2 className="font-host font-regular text-small-title mt-[4vh] -mb-[10vh]">
           statistics
         </h2>
@@ -178,8 +178,8 @@ export default function Statistics({
 
         <div className="flex justify-end mt-10">
           <button
-            className={`px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center justify-center gap-3 font-host font-light text-big-base ${linkClass}`}
-            onClick={() => onNavigate("explanation")} // <-- utilise la fonction passée par Root
+            onClick={() => onNavigate && onNavigate("intro")}
+            className="absolute bottom-10 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center justify-center gap-3 font-host font-light text-big-base"
           >
             <img src={arrowr} alt="arrow right" />
             <span>explanation</span>
