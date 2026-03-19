@@ -3,6 +3,57 @@ import arrow from "./assets/img/svg/arrow.svg";
 import gsap from "gsap";
 
 export default function Introduction({ onEnter }) {
+  useEffect(() => {
+    const preventScroll = (e) => e.preventDefault();
+
+    // Bloquer scroll souris, touch et clavier
+    document.body.style.overflow = "hidden";
+    window.addEventListener("wheel", preventScroll, { passive: false });
+    window.addEventListener("touchmove", preventScroll, { passive: false });
+    window.addEventListener("keydown", (e) => {
+      const keys = [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "PageUp",
+        "PageDown",
+        "Space",
+      ];
+      if (keys.includes(e.code)) e.preventDefault();
+    });
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("wheel", preventScroll);
+      window.removeEventListener("touchmove", preventScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Précharger les images
+    const imagesToPreload = [arrow]; // ajoute ici d'autres images si nécessaire
+    imagesToPreload.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+
+    // Précharger les modèles 3D
+    import("three/examples/jsm/loaders/GLTFLoader").then(({ GLTFLoader }) => {
+      const loader = new GLTFLoader();
+      const modelsToPreload = [
+        "/models/character.glb",
+        "/models/scene.glb",
+        // ajoute ici tous tes modèles
+      ];
+      modelsToPreload.forEach((url) => {
+        loader.load(url, () => {
+          console.log(`${url} préchargé`);
+        });
+      });
+    });
+  }, []);
+
   const arrowRef = useRef(null);
   useEffect(() => {
     gsap.to(arrowRef.current, {

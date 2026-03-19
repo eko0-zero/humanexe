@@ -170,6 +170,33 @@ function getMouseOnPlane(clientX, clientY, camera, renderer, planeOrigin) {
 }
 
 const App = () => {
+  useEffect(() => {
+    const preventScroll = (e) => e.preventDefault();
+
+    // Bloquer scroll souris, touch et clavier
+    document.body.style.overflow = "hidden";
+    window.addEventListener("wheel", preventScroll, { passive: false });
+    window.addEventListener("touchmove", preventScroll, { passive: false });
+    window.addEventListener("keydown", (e) => {
+      // Bloquer les touches flèches et PageUp/PageDown, Space
+      const keys = [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "PageUp",
+        "PageDown",
+        "Space",
+      ];
+      if (keys.includes(e.code)) e.preventDefault();
+    });
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("wheel", preventScroll);
+      window.removeEventListener("touchmove", preventScroll);
+    };
+  }, []);
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
@@ -387,6 +414,10 @@ const App = () => {
       if (isIntroRef.current) return;
       const { clientX, clientY } = getClientPos(e);
       if (!isOverModel(clientX, clientY)) return;
+
+      // Bloquer le scroll
+      document.body.style.overflow = "hidden";
+
       isDraggingRef.current = true;
       const planeOrigin = new THREE.Vector3(
         characterBody.position.x,
@@ -442,6 +473,10 @@ const App = () => {
     const onMouseUp = () => {
       if (showStatsRef.current) return;
       if (!isDraggingRef.current) return;
+
+      // Débloquer le scroll
+      document.body.style.overflow = "";
+
       isDraggingRef.current = false;
       characterBody.mass = 1;
       characterBody.updateMassProperties();
