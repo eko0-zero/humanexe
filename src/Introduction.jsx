@@ -134,13 +134,13 @@ export default function Introduction({ onEnter }) {
       >
         <h1
           ref={headingRef}
-          className="title font-host font-regular text-[6rem] max-[1100px]:text-[5.2rem] min-[1900px]:text-[10rem] text-black opacity-0 translate-y-10"
+          className="title font-host font-regular text-title max-[1100px]:text-[5.2rem] min-[1900px]:text-[10rem] text-black opacity-0 translate-y-10"
         >
           Human.exe
         </h1>
         <p
           ref={contextRef}
-          className="context font-host font-light italic text-[1.3rem] max-[1100px]:text-[1rem] max-[1000px]:w-[65vw] min-[2500px]:text-[1.6rem] text-black w-[45vw] opacity-0 translate-y-10"
+          className="context font-host font-light italic text-base max-[1100px]:text-[1rem] max-[1000px]:w-[65vw] min-[2500px]:text-[1.6rem] text-black w-[45vw] opacity-0 translate-y-10"
         >
           text intro Lorem ipsum dolor sit amet, consectetur adipiscing elit,
           sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut
@@ -152,7 +152,7 @@ export default function Introduction({ onEnter }) {
         className="call-to-action flex flex-col items-center justify-center absolute bottom-10 left-1/2 -translate-x-1/2 opacity-0 translate-y-10"
         ref={ctaRef}
       >
-        <p className="scroll-or-click font-host font-light italic text-[1.8rem] max-[1000px]:text-[1.2rem] text-black text-center">
+        <p className="scroll-or-click font-host font-light italic text-big-base max-[1000px]:text-[1.2rem] text-black text-center">
           scroll or click
         </p>
         <img

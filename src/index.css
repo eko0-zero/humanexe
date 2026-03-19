@@ -28,6 +28,10 @@
 @theme {
   --font-host: "Host Grotesk", sans-serif;
   --text-grey: #383838;
+  --text-title: 7.5625rem;
+  --text-small-title: 5.0625rem;
+  --text-big-base: 2.25rem;
+  --text-base: 1.5rem;
 }
 
 @media (max-height: 700px) {

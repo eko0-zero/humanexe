@@ -142,7 +142,6 @@ export default function Statistics({ spawnedItems, givenItems }) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-30 z-[299]" />
       <div
         ref={ref}
         className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/70 pointer-events-auto w-screen h-screen"
@@ -202,6 +201,7 @@ export default function Statistics({ spawnedItems, givenItems }) {
           </div>
         </div>
       </div>
+      iv
     </>
   );
 }

@@ -657,7 +657,7 @@ const App = () => {
         />
       </div>
 
-      <p className="absolute bottom-5 left-6 font-host italic font-light text-[1.1rem] text-grey z-10">
+      <p className="small-text absolute bottom-5 left-6 font-host italic font-light text-[1.5rem] text-grey z-10">
         Click on "space" or "esc" to open the menu.
       </p>
 
@@ -709,15 +709,7 @@ const App = () => {
         />
       )}
 
-      <canvas
-        ref={canvasRef}
-        style={{
-          display: "block",
-          position: "absolute",
-          top: 0,
-          left: 0,
-        }}
-      />
+      <canvas ref={canvasRef} />
       <Menu open={menuOpen} />
     </main>
   );

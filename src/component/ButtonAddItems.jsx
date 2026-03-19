@@ -359,7 +359,7 @@ export default function ButtonAddItem({
         if (isLockedRef.current?.current) return;
         handleClick();
       }}
-      className="px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-[100px] flex items-center gap-3 font-host font-light text-[1.8rem]"
+      className="px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-[100px] flex items-center gap-3 font-host font-light text-big-base"
     >
       <img src={plus} alt="plus" />
       <span>add item</span>
