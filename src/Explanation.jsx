@@ -6,6 +6,9 @@ import plushiei from "./assets/img/plushie.webp";
 import bati from "./assets/img/bat.webp";
 import knifei from "./assets/img/knife.webp";
 import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const Explanation = ({ onNavigate }) => {
   const containerRef = useRef(null);
@@ -14,12 +17,29 @@ const Explanation = ({ onNavigate }) => {
     const elements = containerRef.current.querySelectorAll(
       "h2, h4, p, img[src$='.webp']",
     );
+    // Initial fade-in animation
     gsap.to(elements, {
       opacity: 1,
       y: -30,
       duration: 2,
       stagger: 0.1,
       ease: "power3.out",
+    });
+
+    const images = containerRef.current.querySelectorAll("img[src$='.webp']");
+    images.forEach((img) => {
+      // Add parallax scroll animation on top of initial fade-in
+      gsap.to(img, {
+        y: "-=60", // move up by 50 relative to current position to add parallax
+        ease: "none",
+        scrollTrigger: {
+          trigger: img,
+          start: "top bottom",
+          end: "bottom top",
+          scrub: 1,
+          // smooth is not a valid ScrollTrigger property, remove it
+        },
+      });
     });
   }, []);
 
