@@ -618,6 +618,11 @@ const App = () => {
 
   return (
     <main className="relative w-full h-screen">
+      {/* Overlay blanc de chargement */}
+      <div
+        className={`absolute inset-0 bg-white z-[1000] pointer-events-none transition-opacity duration-800 ease-out ${ready ? "opacity-0" : "opacity-100"}`}
+      />
+
       <div className="button-healthbar z-100 absolute left-6 right-6 flex-row gap-30">
         <HealthBar healthManager={healthManagerRef.current} />
 
