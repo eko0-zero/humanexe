@@ -82,25 +82,29 @@ export default function Statistics({ spawnedItems, givenItems }) {
     {
       key: "waffle",
       label: "very good",
-      color: "#3b82f6",
+      color: "#105D84",
+      gradient: "linear-gradient(to right, #0079F2, #67ADF4)",
       pct: total ? Math.round((counts.waffle / total) * 100) : 0,
     },
     {
       key: "plushie",
       label: "good",
-      color: "#22c55e",
+      color: "#108420",
+      gradient: "linear-gradient(to right, #18C52F, #7CDC89)",
       pct: total ? Math.round((counts.plushie / total) * 100) : 0,
     },
     {
       key: "bat",
       label: "bad",
-      color: "#f59e0b",
+      color: "#AF7F11",
+      gradient: "linear-gradient(to right, #F89000, #F7C862)",
       pct: total ? Math.round((counts.bat / total) * 100) : 0,
     },
     {
       key: "knife",
       label: "very bad",
-      color: "#ef4444",
+      color: "#AF1111",
+      gradient: "linear-gradient(to right, #E40000, #EA3F3F)",
       pct: total ? Math.round((counts.knife / total) * 100) : 0,
     },
   ];
@@ -144,47 +148,51 @@ export default function Statistics({ spawnedItems, givenItems }) {
     <>
       <div
         ref={ref}
-        className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/70 pointer-events-auto w-screen h-screen"
+        className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/90 pointer-events-auto w-screen h-screen"
       >
         <div className="custom-gap w-[95vw] h-screen relative flex flex-col gap-[10vh]">
           <h2
-            className="font-host font-regular text-[3.8rem]
-         mt-[4vh] -mb-[4vh]"
+            className="font-host font-regular text-small-title
+         mt-[4vh] -mb-[10vh]"
           >
             statistics
           </h2>
-          <p className="font-host font-light italic text-[2.5rem] -mb-[3vh] ">
+          <p className="font-host font-light italic text-big-base -mb-[3vh] ">
             number of items given
           </p>
           <div className="flex gap-[10%]">
-            <p className="font-host font-light italic text-[2.2rem]">
+            <p className="font-host font-light italic text-big-base ">
               total <br /> {total}
             </p>
 
-            <div className="flex flex-col gap-[8vh] w-[100%]">
+            <div className="flex flex-col gap-[6vh] w-[100%] font-host">
               {categories.map((cat, i) => (
                 <div
                   key={cat.key}
-                  className="grid grid-cols-[80px_1fr_100px] items-center gap-4 "
+                  className="grid grid-cols-[100px_1fr_150px] items-center gap-4 "
                 >
                   <span
-                    className="font-bold text-[1.4rem] text-right"
-                    style={{ color: cat.color }}
+                    className="font-light text-big-base text-right pr-5"
+                    style={{
+                      color: cat.color,
+                    }}
                   >
                     {cat.pct}%
                   </span>
-                  <div className="h-4 bg-gray-300 rounded-full overflow-hidden">
+                  <div className="h-5 bg-linear-to-r from-[#D9D0D9] to-[#CECECE] rounded-full overflow-hidden">
                     <div
                       ref={(el) => {
                         if (el) barsRef.current[i] = el;
                       }}
                       className="h-full w-0 rounded-full"
-                      style={{ backgroundColor: cat.color }}
+                      style={{ backgroundImage: cat.gradient }}
                     />
                   </div>
                   <span
-                    className="italic text-[1.2rem]"
-                    style={{ color: cat.color }}
+                    className="italic text-base font-light text-right"
+                    style={{
+                      color: cat.color,
+                    }}
                   >
                     {cat.label}
                   </span>
@@ -193,15 +201,14 @@ export default function Statistics({ spawnedItems, givenItems }) {
             </div>
           </div>
 
-          <div className="flex justify-end mt-10">
-            <button className="absolute bottom-15 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center gap-3 font-host font-light text-[1.8rem]">
+          <div className="flex justify-end item-center mt-10">
+            <button className="absolute bottom-10 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center justify-center gap-3 font-host font-light text-big-base">
               <img src={arrowr} alt="arrow right" />
               <span>explanation</span>
             </button>
           </div>
         </div>
       </div>
-      iv
     </>
   );
 }
