@@ -39,3 +39,37 @@
     gap: 5vh;
   }
 }
+
+.img-text-waf {
+  float: left;
+  shape-outside: url("../src/assets/img/waffle.webp");
+  shape-margin: 0.5rem;
+  width: 30rem;
+  margin-left: -20rem;
+  margin-top: 1rem;
+}
+
+.img-text-plu {
+  float: right;
+  shape-outside: url("../src/assets/img/plushie.webp");
+  shape-margin: 0.5rem;
+  width: 40rem;
+  margin-right: -20rem;
+}
+
+.img-text-bat {
+  float: left;
+  shape-outside: url("../src/assets/img/bat.webp");
+  shape-margin: 0.5rem;
+  width: 50rem;
+  margin-left: -20rem;
+  margin-top: -5rem;
+}
+
+.img-text-kni {
+  float: right;
+  shape-outside: url("../src/assets/img/knife.webp");
+  shape-margin: 0.5rem;
+  width: 40rem;
+  margin-right: -20rem;
+}
