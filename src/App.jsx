@@ -170,7 +170,7 @@ function getMouseOnPlane(clientX, clientY, camera, renderer, planeOrigin) {
   return target;
 }
 
-const App = () => {
+const App = ({ onNavigate }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     const preventScroll = (e) => e.preventDefault();
@@ -710,7 +710,7 @@ const App = () => {
       )}
 
       <canvas ref={canvasRef} />
-      <Menu open={menuOpen} />
+      <Menu open={menuOpen} onNavigate={onNavigate} />
     </main>
   );
 };

@@ -2,10 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import arrowr from "./assets/img/svg/arrow-right.svg";
 
-export default function Statistics({ spawnedItems, givenItems }) {
+export default function Statistics({
+  spawnedItems,
+  givenItems,
+  onNavigate, // onNavigate doit être passé depuis Root
+  linkClass = "", // valeur par défaut si aucune classe supplémentaire
+}) {
   const ref = useRef(null);
   const barsRef = useRef({});
-
   const [counts, setCounts] = useState({
     waffle: 0,
     plushie: 0,
@@ -17,11 +21,9 @@ export default function Statistics({ spawnedItems, givenItems }) {
     const sourceItems = givenItems ?? spawnedItems;
     let itemsArray = [];
 
-    if (Array.isArray(sourceItems)) {
-      itemsArray = sourceItems;
-    } else if (sourceItems && Array.isArray(sourceItems.current)) {
+    if (Array.isArray(sourceItems)) itemsArray = sourceItems;
+    else if (sourceItems && Array.isArray(sourceItems.current))
       itemsArray = sourceItems.current;
-    }
 
     let validItems = itemsArray.filter(
       (item) =>
@@ -44,37 +46,23 @@ export default function Statistics({ spawnedItems, givenItems }) {
       );
     }
 
-    const newCounts = {
-      waffle: 0,
-      plushie: 0,
-      bat: 0,
-      knife: 0,
-    };
+    const newCounts = { waffle: 0, plushie: 0, bat: 0, knife: 0 };
 
     validItems.forEach((item) => {
       const key = item.modelName.toLowerCase().trim();
-
       if (!newCounts.hasOwnProperty(key)) return;
 
       let interactions = 1;
-
-      if (typeof item.interactionCount === "number") {
+      if (typeof item.interactionCount === "number")
         interactions = item.interactionCount;
-      } else if (typeof item.animationCount === "number") {
+      else if (typeof item.animationCount === "number")
         interactions = item.animationCount;
-      }
 
       newCounts[key] += interactions;
     });
 
     setCounts(newCounts);
-  }, [
-    typeof spawnedItems?.length === "number" ? spawnedItems.length : undefined,
-    typeof givenItems?.length === "number" ? givenItems.length : undefined,
-    typeof givenItems?.current?.length === "number"
-      ? givenItems.current.length
-      : undefined,
-  ]);
+  }, [spawnedItems?.length, givenItems?.length, givenItems?.current?.length]);
 
   const total = counts.waffle + counts.plushie + counts.bat + counts.knife;
 
@@ -111,7 +99,6 @@ export default function Statistics({ spawnedItems, givenItems }) {
 
   useEffect(() => {
     if (!ref.current) return;
-
     gsap.fromTo(
       ref.current,
       { opacity: 0 },
@@ -121,7 +108,6 @@ export default function Statistics({ spawnedItems, givenItems }) {
     categories.forEach((cat, i) => {
       const bar = barsRef.current[i];
       if (!bar) return;
-
       gsap.fromTo(
         bar,
         { width: "0%" },
@@ -136,82 +122,70 @@ export default function Statistics({ spawnedItems, givenItems }) {
   }, [total]);
 
   useEffect(() => {
-    // Disable scroll on mount
     document.body.style.overflow = "hidden";
     return () => {
-      // Re-enable scroll on unmount
       document.body.style.overflow = "";
     };
   }, []);
 
   return (
-    <>
-      <div
-        ref={ref}
-        className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/90 pointer-events-auto w-screen h-screen"
-      >
-        <div className="custom-gap w-[95vw] h-screen relative flex flex-col gap-[10vh]">
-          <h2
-            className="font-host font-regular text-small-title
-         mt-[4vh] -mb-[10vh]"
-          >
-            statistics
-          </h2>
-          <p className="font-host font-light italic text-big-base -mb-[3vh] ">
-            number of items given
+    <div
+      ref={ref}
+      className="fixed z-[300] flex items-center justify-center font-host opacity-0 backdrop-blur-[6px] bg-white/90 pointer-events-auto w-screen h-screen"
+    >
+      <div className="custom-gap w-[95vw] h-screen relative flex flex-col gap-[10vh]">
+        <h2 className="font-host font-regular text-small-title mt-[4vh] -mb-[10vh]">
+          statistics
+        </h2>
+        <p className="font-host font-light italic text-big-base -mb-[3vh]">
+          number of items given
+        </p>
+
+        <div className="flex gap-[10%]">
+          <p className="font-host font-light italic text-big-base">
+            total <br /> {total}
           </p>
-          <div className="flex gap-[10%]">
-            <p className="font-host font-light italic text-big-base ">
-              total <br /> {total}
-            </p>
 
-            <div className="flex flex-col gap-[6vh] w-[100%] font-host">
-              {categories.map((cat, i) => (
-                <div
-                  key={cat.key}
-                  className="grid grid-cols-[100px_1fr_150px] items-center gap-4 "
+          <div className="flex flex-col gap-[6vh] w-[100%] font-host">
+            {categories.map((cat, i) => (
+              <div
+                key={cat.key}
+                className="grid grid-cols-[100px_1fr_150px] items-center gap-4"
+              >
+                <span
+                  className="font-light text-big-base text-right pr-5"
+                  style={{ color: cat.color }}
                 >
-                  <span
-                    className="font-light text-big-base text-right pr-5"
-                    style={{
-                      color: cat.color,
-                    }}
-                  >
-                    {cat.pct}%
-                  </span>
-                  <div className="h-5 bg-linear-to-r from-[#D9D0D9] to-[#CECECE] rounded-full overflow-hidden">
-                    <div
-                      ref={(el) => {
-                        if (el) barsRef.current[i] = el;
-                      }}
-                      className="h-full w-0 rounded-full"
-                      style={{ backgroundImage: cat.gradient }}
-                    />
-                  </div>
-                  <span
-                    className="italic text-base font-light text-right"
-                    style={{
-                      color: cat.color,
-                    }}
-                  >
-                    {cat.label}
-                  </span>
+                  {cat.pct}%
+                </span>
+                <div className="h-5 bg-linear-to-r from-[#D9D0D9] to-[#CECECE] rounded-full overflow-hidden">
+                  <div
+                    ref={(el) => (barsRef.current[i] = el)}
+                    className="h-full w-0 rounded-full"
+                    style={{ backgroundImage: cat.gradient }}
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end item-center mt-10">
-            <button
-              href="/explanation"
-              className="absolute bottom-10 px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center justify-center gap-3 font-host font-light text-big-base"
-            >
-              <img src={arrowr} alt="arrow right" />
-              <span>explanation</span>
-            </button>
+                <span
+                  className="italic text-base font-light text-right"
+                  style={{ color: cat.color }}
+                >
+                  {cat.label}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
+
+        <div className="flex justify-end mt-10">
+          <button
+            className={`px-5 py-1 hover:px-7 hover:py-3 z-10 transition-all duration-150 bg-white border-2 border-black rounded-full flex items-center justify-center gap-3 font-host font-light text-big-base ${linkClass}`}
+            onClick={() => onNavigate("explanation")} // <-- utilise la fonction passée par Root
+          >
+            <img src={arrowr} alt="arrow right" />
+            <span>explanation</span>
+          </button>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
