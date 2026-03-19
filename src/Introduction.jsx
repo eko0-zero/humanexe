@@ -38,20 +38,51 @@ export default function Introduction({ onEnter }) {
       img.src = src;
     });
 
-    // Précharger les modèles 3D
-    import("three/examples/jsm/loaders/GLTFLoader").then(({ GLTFLoader }) => {
-      const loader = new GLTFLoader();
-      const modelsToPreload = [
-        "/models/character.glb",
-        "/models/scene.glb",
-        // ajoute ici tous tes modèles
-      ];
-      modelsToPreload.forEach((url) => {
-        loader.load(url, () => {
-          console.log(`${url} préchargé`);
-        });
-      });
-    });
+    // Précharger les modèles 3D avec async/await et gestion d'erreur robuste
+    (async () => {
+      try {
+        const { GLTFLoader } =
+          await import("three/examples/jsm/loaders/GLTFLoader");
+        const loader = new GLTFLoader();
+        const modelsToPreload = [
+          "./3D/models/character.glb",
+          "./3D/models/waffle.glb",
+          "./3D/models/plushie.glb",
+          "./3D/models/bat.glb",
+          "./3D/models/knife.glb",
+        ];
+
+        for (const url of modelsToPreload) {
+          try {
+            // Vérifier si le fichier existe avant de charger
+            const response = await fetch(url, { method: "HEAD" });
+            if (!response.ok) {
+              console.error(
+                `Le fichier ${url} n'existe pas ou est inaccessible.`,
+              );
+              continue;
+            }
+            await new Promise((resolve, reject) => {
+              loader.load(
+                url,
+                (gltf) => {
+                  console.log(`${url} préchargé`);
+                  resolve(gltf);
+                },
+                undefined,
+                (error) => {
+                  reject(error);
+                },
+              );
+            });
+          } catch (error) {
+            console.error(`Erreur lors du chargement de ${url}:`, error);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'importation de GLTFLoader :", error);
+      }
+    })();
   }, []);
 
   const arrowRef = useRef(null);

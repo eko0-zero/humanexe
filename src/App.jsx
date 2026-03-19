@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import Menu from "./component/Menu.jsx";
 import * as THREE from "three";
 import { World, Vec3, Body, Plane, Box } from "cannon-es";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -170,15 +171,16 @@ function getMouseOnPlane(clientX, clientY, camera, renderer, planeOrigin) {
 }
 
 const App = () => {
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     const preventScroll = (e) => e.preventDefault();
 
-    // Bloquer scroll souris, touch et clavier
+    // Bloquer scroll souris et touch
     document.body.style.overflow = "hidden";
     window.addEventListener("wheel", preventScroll, { passive: false });
     window.addEventListener("touchmove", preventScroll, { passive: false });
-    window.addEventListener("keydown", (e) => {
-      // Bloquer les touches flèches et PageUp/PageDown, Space
+
+    const handleKeyDown = (e) => {
       const keys = [
         "ArrowUp",
         "ArrowDown",
@@ -186,15 +188,21 @@ const App = () => {
         "ArrowRight",
         "PageUp",
         "PageDown",
-        "Space",
       ];
-      if (keys.includes(e.code)) e.preventDefault();
-    });
+      if (keys.includes(e.code)) {
+        e.preventDefault();
+      }
+      if (e.code === "Escape" || e.code === "Space") {
+        setMenuOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.body.style.overflow = "";
       window.removeEventListener("wheel", preventScroll);
       window.removeEventListener("touchmove", preventScroll);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
   const canvasRef = useRef(null);
@@ -705,6 +713,7 @@ const App = () => {
           left: 0,
         }}
       />
+      <Menu open={menuOpen} />
     </main>
   );
 };
