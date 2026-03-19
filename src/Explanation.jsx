@@ -1,25 +1,39 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import arrowr from "./assets/img/svg/arrow-right.svg";
 import Menu from "./component/Menu.jsx";
 import wafflei from "./assets/img/waffle.webp";
 import plushiei from "./assets/img/plushie.webp";
 import bati from "./assets/img/bat.webp";
 import knifei from "./assets/img/knife.webp";
+import { gsap } from "gsap";
+
 const Explanation = ({ onNavigate }) => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const elements = containerRef.current.querySelectorAll(
+      "h2, h4, p, img[src$='.webp']",
+    );
+    gsap.to(elements, {
+      opacity: 1,
+      y: -30,
+      duration: 2,
+      stagger: 0.1,
+      ease: "power3.out",
+    });
+  }, []);
+
   return (
     <>
       <Menu open={false} onNavigate={onNavigate} />
 
-      <main className="relative w-full h-screen font-host">
-        <h2
-          className="text-title ml-15 mt-6 mb-[18vh]
-        "
-        >
+      <main ref={containerRef} className="relative w-full h-screen font-host">
+        <h2 className="text-title ml-15 mt-6 mb-[18vh] opacity-0">
           explanation
         </h2>
         <div className="flex flex-col gap-[2vh] ml-[30vw] mr-[10vw] mb-[5vh] ">
-          <h4 className="text-big-base ">Resume</h4>
-          <p className="text-base font-light italic">
+          <h4 className="text-big-base opacity-0">Resume</h4>
+          <p className="text-base font-light italic opacity-0">
             What you have just seen is part of an experiment on dehumanization.
             Using a simplified character and a few objects, it demonstrates how
             certain characteristics can lead us toview others as “non-human” and
@@ -28,8 +42,8 @@ const Explanation = ({ onNavigate }) => {
         </div>
 
         <div className="flex flex-col gap-[2vh] mr-[30vw] ml-[10vw]">
-          <h4 className="text-big-base ">Dehumanization </h4>
-          <p className="text-base font-light italic">
+          <h4 className="text-big-base opacity-0">Dehumanization </h4>
+          <p className="text-base font-light italic opacity-0">
             Dehumanization syndrome occurs when someone is deprived of what
             makes them human: their emotions, their dignity, or their ability to
             feel and interact with others. This can occur in society, for
@@ -41,9 +55,13 @@ const Explanation = ({ onNavigate }) => {
           </p>
         </div>
         <div className="flex flex-col gap-[2vh] mr-[10vw] ml-[40vw] mt-[30vh]">
-          <h4 className="text-big-base ">Waffle</h4>
-          <p className="text-base font-light italic">
-            <img className="img-text-waf" src={wafflei} alt="waffle image" />
+          <h4 className="text-big-base opacity-0">Waffle</h4>
+          <p className="text-base font-light italic opacity-0">
+            <img
+              className="img-text-waf opacity-0"
+              src={wafflei}
+              alt="waffle image"
+            />
             This item is a positive item that grants +20 HP, placing it in the
             “Very Good” category. This is a choice that directly helps improve
             the character’s health and well-being. If this is the item you’ve
@@ -54,9 +72,13 @@ const Explanation = ({ onNavigate }) => {
           </p>
         </div>
         <div className="flex flex-col gap-[2vh] mr-[40vw] ml-[10vw] mt-[10vh]">
-          <h4 className="text-big-base ">Plushie</h4>
-          <p className="text-base font-light italic">
-            <img className="img-text-plu" src={plushiei} alt="plushie image" />
+          <h4 className="text-big-base opacity-0">Plushie</h4>
+          <p className="text-base font-light italic opacity-0">
+            <img
+              className="img-text-plu opacity-0"
+              src={plushiei}
+              alt="plushie image"
+            />
             Cet élément est positif : il confère +10 PV, ce qui le classe dans
             la catégorie « Bon ». Le fait de choisir cet élément le plus souvent
             suggère que vous privilégiez systématiquement les actions qui ont
@@ -69,9 +91,13 @@ const Explanation = ({ onNavigate }) => {
           </p>
         </div>
         <div className="flex flex-col gap-[2vh] mr-[10vw] ml-[40vw] mt-[20vh]">
-          <h4 className="text-big-base ">Baseball bat</h4>
-          <p className="text-base font-light italic">
-            <img className="img-text-bat" src={bati} alt="bat image" />
+          <h4 className="text-big-base opacity-0">Baseball bat</h4>
+          <p className="text-base font-light italic opacity-0">
+            <img
+              className="img-text-bat opacity-0"
+              src={bati}
+              alt="bat image"
+            />
             This item has a negative effect that reduces HP by 30, which places
             it in the “Bad” category. If this is the item you distributed most
             often, it suggests a tendency to make choices that may harm others,
@@ -81,9 +107,13 @@ const Explanation = ({ onNavigate }) => {
           </p>
         </div>
         <div className="flex flex-col gap-[2vh] mr-[40vw] ml-[10vw] mt-[6vh] mb-[10vh]">
-          <h4 className="text-big-base  ">Knife</h4>
-          <p className="text-base font-light italic">
-            <img className="img-text-kni" src={knifei} alt="plushie image" />
+          <h4 className="text-big-base opacity-0">Knife</h4>
+          <p className="text-base font-light italic opacity-0">
+            <img
+              className="img-text-kni opacity-0"
+              src={knifei}
+              alt="plushie image"
+            />
             This item has a negative effect: it reduces HP by 50, which places
             it in the “Bad” category. If this is the item you distributed most
             often, it suggests a clear tendency to make choices that may harm
