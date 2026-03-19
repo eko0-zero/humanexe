@@ -43,7 +43,7 @@
 .img-text-waf {
   float: left;
   shape-outside: url("../src/assets/img/waffle.webp");
-  shape-margin: 1rem;
+  shape-margin: 2rem;
   width: 30rem;
   margin-left: -20rem;
   margin-top: 1rem;

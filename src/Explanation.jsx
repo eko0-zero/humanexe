@@ -99,15 +99,14 @@ const Explanation = ({ onNavigate }) => {
               src={plushiei}
               alt="plushie image"
             />
-            Cet élément est positif : il confère +10 PV, ce qui le classe dans
-            la catégorie « Bon ». Le fait de choisir cet élément le plus souvent
-            suggère que vous privilégiez systématiquement les actions qui ont
-            des effets bénéfiques pour les autres. Cela reflète une approche
-            réfléchie de la prise de décision, montrant une tendance à agir de
-            manière à renforcer la sécurité, la santé dans votre environnement.
-            Ce schéma indique un état d'esprit empathique, qui valorise les
-            résultats constructifs et cherche à maximiser l'impact positif par
-            des choix réfléchis et attentionnés.
+            This item is positive: it grants +10 HP, which places it in the
+            “Good” category. Choosing this element most often suggests that you
+            consistently prioritize actions that have beneficial effects on
+            others. This reflects a thoughtful approach to decision-making,
+            showing a tendency to act in ways that enhance safety and health in
+            your environment. This pattern indicates an empathetic mindset that
+            values constructive outcomes and seeks to maximize positive impact
+            through thoughtful and considerate choices.
           </p>
         </div>
         <div className="flex flex-col gap-[2vh] mr-[10vw] ml-[40vw] mt-[20vh]">
