@@ -54,7 +54,7 @@ function createLights(scene) {
   dirLight.position.set(0, 8, 5);
   dirLight.target.position.set(0, 0, 0);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.set(6048, 6048);
+  dirLight.shadow.mapSize.set(5048, 5048);
   dirLight.shadow.camera.left = -10;
   dirLight.shadow.camera.right = 10;
   dirLight.shadow.camera.top = 10;
