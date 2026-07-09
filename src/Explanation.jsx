@@ -158,7 +158,8 @@ const Explanation = ({ onNavigate }) => {
             my third year capstone project, centered on the theme “Out of
             Control.” Thank you for visiting !!
           </p>
-          <p className="text-right mr-10 mb-5">Clara Del Vecchio</p>
+
+          <p className="text-right mr-10 mb-5">Clara Del Vecchio <span className="px-2.5">-</span> eko0 zero</p>
         </div>
       </main>
     </>
